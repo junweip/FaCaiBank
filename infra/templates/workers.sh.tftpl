@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+exec > >(tee /var/log/facaibank-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+dnf install -y python3.12 python3.12-pip unzip
+mkdir -p /opt/facaibank/workers
+aws s3 cp "s3://${bucket_name}/${bundle_key}" /tmp/workers.zip --region "${aws_region}"
+unzip -q -o /tmp/workers.zip -d /opt/facaibank/workers
+python3.12 -m venv /opt/facaibank/workers/venv
+/opt/facaibank/workers/venv/bin/pip install --no-cache-dir -r /opt/facaibank/workers/requirements.txt
+
+cat > /etc/facaibank-workers.env <<'ENV'
+AWS_REGION=${aws_region}
+LEDGER_TABLE_NAME=${ledger_table_name}
+EVENTS_QUEUE_URL=${events_queue_url}
+STATEMENT_QUEUE_URL=${statement_queue_url}
+KYC_STATEMENTS_BUCKET=${bucket_name}
+ENV
+chmod 600 /etc/facaibank-workers.env
+
+for worker in outbox statement; do
+  module="outbox_worker"
+  if [ "$worker" = "statement" ]; then module="statement_worker"; fi
+  cat > "/etc/systemd/system/facaibank-$worker-worker.service" <<UNIT
+[Unit]
+Description=FaCaiBank $worker background worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/facaibank/workers
+EnvironmentFile=/etc/facaibank-workers.env
+ExecStart=/opt/facaibank/workers/venv/bin/python /opt/facaibank/workers/$module.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl enable "facaibank-$worker-worker.service"
+done
+
+systemctl daemon-reload
+systemctl start facaibank-outbox-worker.service
+systemctl start facaibank-statement-worker.service

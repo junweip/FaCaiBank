@@ -1,0 +1,33 @@
+#!/bin/bash
+set -euo pipefail
+exec > >(tee /var/log/facaibank-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+dnf install -y nginx python3.12 unzip
+mkdir -p /opt/facaibank
+aws s3 cp "s3://${bucket_name}/${bundle_key}" /tmp/frontend.zip --region "${aws_region}"
+unzip -q -o /tmp/frontend.zip -d /usr/share/nginx/html
+printf 'window.FACAI_API_BASE = "/api";\n' > /usr/share/nginx/html/config.js
+python3.12 -c 'from pathlib import Path; path=Path("/usr/share/nginx/html/index.html"); text=path.read_text(); text=text.replace("<script src=\"./config.js\"></script>", "<script src=\"/config.js\"></script>"); text=text.replace("<script src=\"./app.js\" defer></script>", "<script src=\"/app.js\" defer></script>"); path.write_text(text)'
+cat > /etc/nginx/conf.d/facaibank.conf <<'NGINX'
+server {
+    listen 8080 default_server;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://${internal_alb_dns}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+NGINX
+rm -f /etc/nginx/conf.d/ssl.conf
+systemctl enable --now nginx

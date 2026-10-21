@@ -99,3 +99,33 @@ variable "lambda_memory_size" {
   type        = number
   default     = 128
 }
+
+variable "app_instance_type" {
+  description = "EC2 instance type for frontend, API, and worker Auto Scaling Groups."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "asg_min_size" {
+  description = "Minimum capacity for each application Auto Scaling Group."
+  type        = number
+  default     = 1
+}
+
+variable "asg_max_size" {
+  description = "Maximum capacity for each application Auto Scaling Group."
+  type        = number
+  default     = 3
+}
+
+variable "asg_desired_capacity" {
+  description = "Desired capacity for each application Auto Scaling Group."
+  type        = number
+  default     = 1
+}
+
+variable "monthly_budget_limit" {
+  description = "Monthly AWS cost budget in USD."
+  type        = number
+  default     = 200
+}

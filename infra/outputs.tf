@@ -58,6 +58,11 @@ output "events_dlq_arn" {
   value       = aws_sqs_queue.events_dlq.arn
 }
 
+output "events_dlq_url" {
+  description = "URL of the notification events dead-letter queue."
+  value       = aws_sqs_queue.events_dlq.url
+}
+
 output "statement_jobs_queue_url" {
   description = "URL of the statement jobs SQS queue."
   value       = aws_sqs_queue.statement_jobs.url
@@ -71,4 +76,49 @@ output "statement_dlq_arn" {
 output "notifications_topic_arn" {
   description = "ARN of the customer notifications SNS topic."
   value       = aws_sns_topic.notifications.arn
+}
+
+output "public_alb_dns_name" {
+  description = "Public URL hostname for the FaCaiBank frontend."
+  value       = aws_lb.public.dns_name
+}
+
+output "internal_alb_dns_name" {
+  description = "Private hostname for the backend API."
+  value       = aws_lb.internal.dns_name
+}
+
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID."
+  value       = aws_cognito_user_pool.main.id
+}
+
+output "cognito_user_pool_client_id" {
+  description = "Public Cognito app client ID."
+  value       = aws_cognito_user_pool_client.frontend.id
+}
+
+output "cognito_hosted_ui_domain" {
+  description = "Cognito hosted UI domain prefix."
+  value       = aws_cognito_user_pool_domain.main.domain
+}
+
+output "frontend_asg_name" {
+  description = "Frontend Auto Scaling Group name."
+  value       = aws_autoscaling_group.frontend.name
+}
+
+output "backend_asg_name" {
+  description = "Backend API Auto Scaling Group name."
+  value       = aws_autoscaling_group.backend.name
+}
+
+output "workers_asg_name" {
+  description = "Background workers Auto Scaling Group name."
+  value       = aws_autoscaling_group.workers.name
+}
+
+output "alerts_topic_arn" {
+  description = "SNS topic for CloudWatch and AWS Budget alerts."
+  value       = aws_sns_topic.alerts.arn
 }
