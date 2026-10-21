@@ -1,0 +1,10 @@
+env                        = "dev"
+aws_region                 = "ap-southeast-1"
+vpc_cidr                   = "10.0.0.0/16"
+public_subnet_cidrs        = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+private_app_subnet_cidrs   = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+private_data_subnet_cidrs  = ["10.0.21.0/24", "10.0.22.0/24", "10.0.23.0/24"]
+single_nat_gateway         = true
+rds_multi_az               = false
+enable_interface_endpoints = false
+db_instance_class          = "db.t4g.micro"
