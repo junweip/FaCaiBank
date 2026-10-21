@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f6f2">
+    <title>FaCai Bank — Everyday, in balance</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#overview" aria-label="FaCai Bank home">
+          <span class="brand-mark" aria-hidden="true">F</span>
+          <span>facai<span class="brand-light">bank</span></span>
+        </a>
+
+        <div class="workspace-label">YOUR SPACE</div>
+        <nav class="navigation">
+          <a class="nav-link active" href="#overview"><span class="nav-icon">⌂</span>Overview</a>
+          <a class="nav-link" href="#transfer"><span class="nav-icon">↗</span>Transfers</a>
+          <a class="nav-link" href="#activity"><span class="nav-icon">◷</span>Activity</a>
+          <a class="nav-link" href="#services"><span class="nav-icon">▧</span>Documents</a>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="help-card">
+            <span class="help-icon">✳</span>
+            <strong>Here to help</strong>
+            <p>Your money questions, answered simply.</p>
+            <a href="mailto:support@facaibank.example">Get in touch <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="profile">
+            <div class="avatar">FC</div>
+            <div><strong>FaCai customer</strong><span>Personal account</span></div>
+            <span class="profile-more" aria-hidden="true">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="overview">
+        <header class="topbar">
+          <div class="breadcrumb">Personal banking <span>/</span> <strong>Overview</strong></div>
+          <div class="topbar-actions">
+            <span class="secure-label"><span class="secure-dot"></span> Your money is secure</span>
+            <button class="icon-button" type="button" aria-label="Notifications">♧<span class="notification-dot"></span></button>
+          </div>
+        </header>
+
+        <section class="welcome-row">
+          <div>
+            <p class="eyebrow" id="today-label">YOUR FINANCIAL HOME</p>
+            <h1>Good things are<br class="mobile-break"> in <span>balance.</span></h1>
+            <p class="welcome-copy">A little more clarity for everything you’re building.</p>
+          </div>
+          <button class="button button-dark" type="button" data-open-modal="account-modal"><span>＋</span> Open an account</button>
+        </section>
+
+        <section class="summary-grid" aria-label="Account summary">
+          <article class="balance-card">
+            <div class="card-topline">
+              <span class="card-label">TOTAL BALANCE</span>
+              <button class="more-button" type="button" aria-label="More balance options">···</button>
+            </div>
+            <p class="balance-amount" id="balance-amount">$0.00</p>
+            <div class="account-picker">
+              <span class="account-icon">F</span>
+              <span id="account-summary">Select an account to get started</span>
+              <button id="refresh-balance" class="refresh-button" type="button" aria-label="Refresh balance">↻</button>
+            </div>
+            <div class="balance-decoration decoration-one"></div>
+            <div class="balance-decoration decoration-two"></div>
+          </article>
+
+          <article class="quick-card">
+            <div class="card-topline">
+              <span class="card-label">QUICK ACTIONS</span>
+              <span class="sparkle" aria-hidden="true">✳</span>
+            </div>
+            <div class="quick-actions">
+              <a class="quick-action" href="#transfer">
+                <span class="action-icon transfer-icon">↗</span><span>Send money</span>
+              </a>
+              <button class="quick-action" type="button" data-open-modal="statement-modal">
+                <span class="action-icon document-icon">▤</span><span>Get a statement</span>
+              </button>
+              <button class="quick-action" type="button" data-open-modal="kyc-modal">
+                <span class="action-icon verify-icon">✓</span><span>Verify identity</span>
+              </button>
+            </div>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <div class="primary-column">
+            <section class="panel transfer-panel" id="transfer">
+              <div class="section-heading">
+                <div><p class="eyebrow">MOVE WITH EASE</p><h2>Make a transfer</h2></div>
+                <span class="heading-icon">↗</span>
+              </div>
+              <form id="transfer-form" class="form-grid">
+                <label class="field field-full">From account
+                  <select name="sender_account_id" class="account-options" required>
+                    <option value="">Select your account</option>
+                  </select>
+                </label>
+                <label class="field field-full">To account
+                  <input name="receiver_account_id" type="text" placeholder="Enter recipient account ID" required>
+                </label>
+                <label class="field">Amount
+                  <span class="input-with-prefix"><span>$</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></span>
+                </label>
+                <button class="button button-green transfer-submit" type="submit">Review transfer <span>→</span></button>
+              </form>
+              <p class="form-hint"><span>♧</span> Transfers are protected with secure, one-time processing.</p>
+            </section>
+
+            <section class="panel activity-panel" id="activity">
+              <div class="section-heading activity-heading">
+                <div><p class="eyebrow">THE LITTLE DETAILS</p><h2>Recent activity</h2></div>
+                <button class="text-button" id="refresh-transactions" type="button">Refresh <span>↻</span></button>
+              </div>
+              <div id="activity-list" class="activity-list">
+                <div class="empty-state"><span class="empty-icon">◷</span><strong>Your story starts here</strong><p>Create an account to see your transactions.</p></div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="secondary-column" id="services">
+            <section class="panel account-panel">
+              <div class="section-heading compact-heading">
+                <div><p class="eyebrow">AT A GLANCE</p><h2>Your accounts</h2></div>
+                <span class="heading-icon small">▤</span>
+              </div>
+              <div id="account-list" class="account-list">
+                <div class="account-empty">Your accounts will appear here.</div>
+              </div>
+              <button class="button button-outline full-button" type="button" data-open-modal="account-modal">＋ Add an account</button>
+            </section>
+
+            <section class="statement-banner">
+              <span class="banner-orbit orbit-a"></span><span class="banner-orbit orbit-b"></span>
+              <div class="banner-content">
+                <span class="banner-icon">✦</span>
+                <p class="eyebrow">STAY IN THE KNOW</p>
+                <h2>Your money,<br>on paper.</h2>
+                <p>Request a statement whenever you need one.</p>
+                <button type="button" data-open-modal="statement-modal">Request statement <span>→</span></button>
+              </div>
+            </section>
+          </aside>
+        </section>
+        <footer class="page-footer"><span>FaCai Bank</span><span>Small steps. Stronger futures.</span><span>Demo experience</span></footer>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog class="modal" id="account-modal">
+      <form id="account-form" class="modal-card">
+        <button class="modal-close" type="button" aria-label="Close">×</button>
+        <p class="eyebrow">A FRESH START</p><h2>Open an account</h2>
+        <p class="modal-copy">Let’s get your everyday banking set up. Your new account starts with a $1,000 demo balance.</p>
+        <label class="field">Full name<input name="full_name" autocomplete="name" required minlength="2" maxlength="120" placeholder="Your name"></label>
+        <label class="field">Email address<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+        <button class="button button-green full-button" type="submit">Create my account <span>→</span></button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="kyc-modal">
+      <form id="kyc-form" class="modal-card">
+        <button class="modal-close" type="button" aria-label="Close">×</button>
+        <p class="eyebrow">A QUICK CHECK-IN</p><h2>Verify your identity</h2>
+        <p class="modal-copy">Upload a document for this demo account. Files are stored securely with server-side encryption.</p>
+        <label class="field">Account
+          <select name="account_id" class="account-options" required><option value="">Select an account</option></select>
+        </label>
+        <label class="field upload-field">Choose a document<input name="file" type="file" required><span>PDF, PNG or JPG · Up to 10 MB</span></label>
+        <button class="button button-green full-button" type="submit">Upload securely <span>→</span></button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="statement-modal">
+      <form id="statement-form" class="modal-card">
+        <button class="modal-close" type="button" aria-label="Close">×</button>
+        <p class="eyebrow">YOUR RECORDS, READY WHEN YOU ARE</p><h2>Request a statement</h2>
+        <p class="modal-copy">We’ll add a statement job to the secure processing queue.</p>
+        <label class="field">Account
+          <select name="account_id" class="account-options" required><option value="">Select an account</option></select>
+        </label>
+        <div class="form-grid">
+          <label class="field">From<input name="start_date" type="date"></label>
+          <label class="field">To<input name="end_date" type="date"></label>
+        </div>
+        <button class="button button-green full-button" type="submit">Request statement <span>→</span></button>
+      </form>
+    </dialog>
+  </body>
+</html>
