@@ -115,6 +115,7 @@ resource "aws_iam_role_policy" "notifier" {
         Action = [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
         ]
         Resource = aws_dynamodb_table.ledger.arn
