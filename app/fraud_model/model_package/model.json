@@ -1,0 +1,14 @@
+{
+  "name": "facaibank-transfer-risk",
+  "version": "2026.10.1",
+  "type": "logistic_regression",
+  "intercept": -6.0,
+  "weights": {
+    "log10_amount": 1.05,
+    "amount_to_balance": 1.6,
+    "is_night_sgt": 0.9,
+    "is_new_payee": 1.2,
+    "velocity": 2.5
+  },
+  "notes": "Hand-calibrated prototype coefficients. Replace with a model trained on labelled transfers before production."
+}
