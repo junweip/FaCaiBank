@@ -2,96 +2,126 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
-from dataclasses import dataclass
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from pathlib import PurePosixPath
-from threading import Lock
+from typing import Annotated, Literal
 
 import boto3
-import psycopg
+from botocore import UNSIGNED
+from botocore.config import Config
 from botocore.exceptions import ClientError
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi.responses import JSONResponse
 from psycopg.errors import UniqueViolation
-from psycopg.rows import dict_row
-from boto3.dynamodb.types import TypeSerializer
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+
+from . import auth, cache, config, db, external_bank, fraud, ledger, metrics
+from .auth import AuthenticatedUser, current_user
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+
+PROFILE_TTL_SECONDS = 60
+OWNER_TTL_SECONDS = 3600
+MAX_ACCOUNTS_PER_CUSTOMER = 5
+MAX_AMOUNT = Decimal("200000.00")
+IDEMPOTENCY_KEY = re.compile(r"[A-Za-z0-9_.:\-]{8,128}")
+KYC_SIGNATURES = {
+    "application/pdf": (b"%PDF",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+}
 
 
-@dataclass(frozen=True)
-class Settings:
-    aws_region: str = os.getenv("AWS_REGION", "ap-southeast-1")
-    database_host: str = os.getenv("DATABASE_HOST", "")
-    database_name: str = os.getenv("DATABASE_NAME", "facaibank")
-    database_port: int = int(os.getenv("DATABASE_PORT", "5432"))
-    database_secret_arn: str = os.getenv("DATABASE_SECRET_ARN", "")
-    ledger_table_name: str = os.getenv("LEDGER_TABLE_NAME", "facaibank-ledger")
-    kyc_statements_bucket: str = os.getenv("KYC_STATEMENTS_BUCKET", "")
-    statement_queue_url: str = os.getenv("STATEMENT_QUEUE_URL", "")
-    cors_origins: str = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5500",
-    )
-    max_upload_bytes: int = 10 * 1024 * 1024
+def validate_uuid(value: str, label: str = "Account") -> str:
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError, TypeError) as error:
+        raise HTTPException(status_code=404, detail=f"{label} was not found") from error
 
 
-settings = Settings()
-serializer = TypeSerializer()
-_schema_lock = Lock()
-_schema_initialized = False
+def validate_amount(value: Decimal) -> Decimal:
+    if not value.is_finite() or value <= 0:
+        raise ValueError("Amount must be a positive number")
+    try:
+        cents = value.quantize(Decimal("0.01"))
+    except InvalidOperation as error:
+        raise ValueError("Amount must have at most two decimal places") from error
+    if cents != value:
+        raise ValueError("Amount must have at most two decimal places")
+    if cents > MAX_AMOUNT:
+        raise ValueError(f"Amount must not exceed {MAX_AMOUNT}")
+    return cents
 
 
-class AccountCreate(BaseModel):
+def validate_account_field(value: str) -> str:
+    try:
+        return str(uuid.UUID(value))
+    except ValueError as error:
+        raise ValueError("Account ID must be a valid account number") from error
+
+
+AccountId = Annotated[str, AfterValidator(validate_account_field)]
+Amount = Annotated[Decimal, AfterValidator(validate_amount)]
+
+
+class ProfileCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
-    email: str = Field(min_length=3, max_length=254)
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        normalized = value.strip().lower()
-        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
-            raise ValueError("A valid email address is required")
-        return normalized
 
     @field_validator("full_name")
     @classmethod
     def normalize_name(cls, value: str) -> str:
-        normalized = value.strip()
+        normalized = " ".join(value.split())
         if len(normalized) < 2:
             raise ValueError("Full name must contain at least two characters")
         return normalized
 
 
+class AccountCreate(BaseModel):
+    account_type: Literal["EVERYDAY", "SAVINGS"] = "EVERYDAY"
+    nickname: str | None = Field(default=None, max_length=60)
+
+    @field_validator("nickname")
+    @classmethod
+    def normalize_nickname(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return " ".join(value.split()) or None
+
+
 class TransferRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    sender_account_id: str = Field(min_length=1, max_length=64)
-    receiver_account_id: str = Field(min_length=1, max_length=64)
-    amount: Decimal
+    sender_account_id: AccountId
+    receiver_account_id: AccountId
+    amount: Amount
 
-    @field_validator("amount")
+
+class ExternalTransferRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    amount: Amount
+    bank_code: str = Field(min_length=2, max_length=8)
+    external_account: str = Field(min_length=9, max_length=12)
+
+    @field_validator("bank_code")
     @classmethod
-    def validate_amount(cls, value: Decimal) -> Decimal:
-        if not value.is_finite() or value <= 0:
-            raise ValueError("Amount must be a positive number")
-        try:
-            cents = value.quantize(Decimal("0.01"))
-        except InvalidOperation as error:
-            raise ValueError("Amount must have at most two decimal places") from error
-        if cents != value:
-            raise ValueError("Amount must have at most two decimal places")
-        return cents
+    def normalize_bank(cls, value: str) -> str:
+        return value.upper()
 
 
 class StatementRequest(BaseModel):
-    account_id: str = Field(min_length=1, max_length=64)
+    account_id: AccountId
     start_date: date | None = None
     end_date: date | None = None
 
@@ -104,18 +134,43 @@ class StatementRequest(BaseModel):
         return end_date
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    metrics.recorder.start()
+    yield
+    metrics.recorder.flush()
+
+
 app = FastAPI(
     title="FaCaiBank API",
-    description="Demo account, KYC, transfer, and statement services.",
-    version="1.0.0",
+    description="Accounts, KYC, transfers, deposits, withdrawals and statements.",
+    version="2.0.0",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
+    allow_origins=[origin.strip() for origin in config.settings.cors_origins.split(",") if origin.strip()],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Idempotency-Key"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+    expose_headers=["Idempotent-Replayed", "X-Request-Id"],
 )
+
+
+@app.middleware("http")
+async def observe_request(request: Request, call_next):
+    started = time.perf_counter()
+    request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-Id"] = request_id
+        return response
+    finally:
+        route = request.scope.get("route")
+        endpoint = getattr(route, "name", None) or "unmatched"
+        metrics.recorder.record(endpoint, (time.perf_counter() - started) * 1000, status_code)
 
 
 def required_setting(value: str, name: str) -> str:
@@ -125,497 +180,565 @@ def required_setting(value: str, name: str) -> str:
 
 
 @lru_cache(maxsize=1)
-def secrets_manager():
-    return boto3.client("secretsmanager", region_name=settings.aws_region)
-
-
-@lru_cache(maxsize=1)
-def dynamodb_client():
-    return boto3.client("dynamodb", region_name=settings.aws_region)
-
-
-@lru_cache(maxsize=1)
-def dynamodb_table():
-    return boto3.resource("dynamodb", region_name=settings.aws_region).Table(
-        required_setting(settings.ledger_table_name, "LEDGER_TABLE_NAME")
-    )
-
-
-@lru_cache(maxsize=1)
 def s3_client():
-    return boto3.client("s3", region_name=settings.aws_region)
+    return boto3.client(
+        "s3",
+        region_name=config.settings.aws_region,
+        config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+    )
 
 
 @lru_cache(maxsize=1)
 def sqs_client():
-    return boto3.client("sqs", region_name=settings.aws_region)
+    return boto3.client("sqs", region_name=config.settings.aws_region)
 
 
-def database_credentials() -> dict[str, str]:
-    secret_arn = required_setting(settings.database_secret_arn, "DATABASE_SECRET_ARN")
-    response = secrets_manager().get_secret_value(SecretId=secret_arn)
-    secret_string = response.get("SecretString")
-    if not secret_string:
-        raise HTTPException(status_code=503, detail="Database credentials secret is empty")
-    try:
-        secret = json.loads(secret_string)
-    except json.JSONDecodeError as error:
-        logger.exception("Database credentials secret is not valid JSON")
-        raise HTTPException(status_code=503, detail="Database credentials secret is invalid") from error
-    if not isinstance(secret, dict) or not secret.get("username") or not secret.get("password"):
-        raise HTTPException(status_code=503, detail="Database credentials secret is missing fields")
-    return {"username": secret["username"], "password": secret["password"]}
+@lru_cache(maxsize=1)
+def sns_client():
+    return boto3.client("sns", region_name=config.settings.aws_region)
 
 
-def parse_database_endpoint(endpoint: str, default_port: int) -> tuple[str, int]:
-    host, separator, port_text = endpoint.rpartition(":")
-    if separator and port_text.isdigit():
-        return host, int(port_text)
-    return endpoint, default_port
-
-
-def connect_database():
-    endpoint = required_setting(settings.database_host, "DATABASE_HOST")
-    host, port = parse_database_endpoint(endpoint, settings.database_port)
-    credentials = database_credentials()
-    return psycopg.connect(
-        host=host,
-        port=port,
-        dbname=settings.database_name,
-        user=credentials["username"],
-        password=credentials["password"],
-        connect_timeout=5,
-        sslmode=os.getenv("DATABASE_SSLMODE", "require"),
-        row_factory=dict_row,
+@lru_cache(maxsize=1)
+def cognito_client():
+    return boto3.client(
+        "cognito-idp",
+        region_name=config.settings.aws_region,
+        config=Config(signature_version=UNSIGNED),
     )
 
 
-def ensure_database_schema(connection) -> None:
-    global _schema_initialized
-    if _schema_initialized:
-        return
-
-    with _schema_lock:
-        if _schema_initialized:
-            return
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS customers (
-                    user_id UUID PRIMARY KEY,
-                    full_name VARCHAR(120) NOT NULL,
-                    email VARCHAR(254) NOT NULL UNIQUE,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS accounts (
-                    account_id UUID PRIMARY KEY,
-                    user_id UUID NOT NULL REFERENCES customers(user_id),
-                    kyc_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-        connection.commit()
-        _schema_initialized = True
+def _iso(value) -> str | None:
+    return value.isoformat() if isinstance(value, (datetime, date)) else value
 
 
-def serialize_item(item: dict) -> dict:
-    return {key: serializer.serialize(value) for key, value in item.items()}
-
-
-def decimal_string(value: Decimal) -> str:
-    return format(value.quantize(Decimal("0.01")), "f")
-
-
-def mock_fraud_score(amount: Decimal) -> Decimal:
-    if amount >= Decimal("10000.00"):
-        return Decimal("0.95")
-    if amount >= Decimal("2500.00"):
-        return Decimal("0.65")
-    return Decimal("0.05")
-
-
-def build_transfer_items(
-    sender_account_id: str,
-    receiver_account_id: str,
-    amount: Decimal,
-    idempotency_key: str,
-    transfer_id: str,
-    timestamp: str,
-) -> list[dict]:
-    table_name = required_setting(settings.ledger_table_name, "LEDGER_TABLE_NAME")
-    amount = amount.quantize(Decimal("0.01"))
-    transaction_key = f"TXN#{timestamp}#{transfer_id}"
-    event_id = str(uuid.uuid4())
-    event_payload = {
-        "event_id": event_id,
-        "event_type": "TRANSFER_COMPLETED",
-        "transfer_id": transfer_id,
-        "sender_account_id": sender_account_id,
-        "receiver_account_id": receiver_account_id,
-        "amount": decimal_string(amount),
-        "currency": "USD",
-        "created_at": timestamp,
+def load_profile(subject: str, use_cache: bool = True) -> dict | None:
+    store = cache.get_cache()
+    if use_cache:
+        cached = store.get(cache.profile_key(subject))
+        if cached:
+            return cached
+    db.ensure_schema()
+    with db.primary.connection() as conn, conn.cursor() as cursor:
+        cursor.execute(
+            "SELECT user_id, full_name, email, kyc_status, kyc_verified_at, alert_subscription_arn, created_at "
+            "FROM customers WHERE cognito_sub = %s",
+            (subject,),
+        )
+        customer = cursor.fetchone()
+        if customer is None:
+            return None
+        cursor.execute(
+            "SELECT account_id, account_type, nickname, currency, created_at "
+            "FROM accounts WHERE user_id = %s ORDER BY created_at",
+            (customer["user_id"],),
+        )
+        accounts = cursor.fetchall()
+    profile = {
+        "customer_id": str(customer["user_id"]),
+        "full_name": customer["full_name"],
+        "email": customer["email"],
+        "kyc_status": customer["kyc_status"],
+        "kyc_verified_at": _iso(customer["kyc_verified_at"]),
+        "alert_subscription_arn": customer["alert_subscription_arn"],
+        "created_at": _iso(customer["created_at"]),
+        "accounts": [
+            {
+                "account_id": str(account["account_id"]),
+                "account_type": account["account_type"],
+                "nickname": account["nickname"],
+                "currency": account["currency"],
+                "created_at": _iso(account["created_at"]),
+            }
+            for account in accounts
+        ],
     }
-    amount_av = serializer.serialize(amount)
-    timestamp_av = serializer.serialize(timestamp)
-    idempotency_av = serializer.serialize(idempotency_key)
-
-    sender_update = {
-        "TableName": table_name,
-        "Key": serialize_item({"PK": f"ACCOUNT#{sender_account_id}", "SK": "BALANCE"}),
-        "UpdateExpression": (
-            "SET #balance = #balance - :amount, "
-            "last_idempotency_key = :idempotency_key, updated_at = :timestamp"
-        ),
-        "ConditionExpression": (
-            "attribute_exists(PK) AND #balance >= :amount AND "
-            "(attribute_not_exists(last_idempotency_key) "
-            "OR last_idempotency_key <> :idempotency_key)"
-        ),
-        "ExpressionAttributeNames": {"#balance": "balance"},
-        "ExpressionAttributeValues": {
-            ":amount": amount_av,
-            ":idempotency_key": idempotency_av,
-            ":timestamp": timestamp_av,
-        },
-    }
-    receiver_update = {
-        "TableName": table_name,
-        "Key": serialize_item({"PK": f"ACCOUNT#{receiver_account_id}", "SK": "BALANCE"}),
-        "UpdateExpression": "SET #balance = #balance + :amount, updated_at = :timestamp",
-        "ConditionExpression": "attribute_exists(PK)",
-        "ExpressionAttributeNames": {"#balance": "balance"},
-        "ExpressionAttributeValues": {
-            ":amount": amount_av,
-            ":timestamp": timestamp_av,
-        },
-    }
-
-    debit = {
-        "PK": f"ACCOUNT#{sender_account_id}",
-        "SK": transaction_key,
-        "record_type": "LEDGER_ENTRY",
-        "transfer_id": transfer_id,
-        "entry_type": "DEBIT",
-        "amount": amount,
-        "currency": "USD",
-        "counterparty_account_id": receiver_account_id,
-        "idempotency_key": idempotency_key,
-        "created_at": timestamp,
-    }
-    credit = {
-        "PK": f"ACCOUNT#{receiver_account_id}",
-        "SK": transaction_key,
-        "record_type": "LEDGER_ENTRY",
-        "transfer_id": transfer_id,
-        "entry_type": "CREDIT",
-        "amount": amount,
-        "currency": "USD",
-        "counterparty_account_id": sender_account_id,
-        "idempotency_key": idempotency_key,
-        "created_at": timestamp,
-    }
-    outbox = {
-        "PK": f"OUTBOX#{transfer_id}",
-        "SK": "EVENT",
-        "record_type": "OUTBOX_EVENT",
-        **event_payload,
-        "payload": event_payload,
-    }
-    idempotency_record = {
-        "PK": f"IDEMPOTENCY#{idempotency_key}",
-        "SK": "TRANSFER",
-        "transfer_id": transfer_id,
-        "created_at": timestamp,
-    }
-
-    def conditional_put(item: dict) -> dict:
-        return {
-            "TableName": table_name,
-            "Item": serialize_item(item),
-            "ConditionExpression": "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-        }
-
-    return [
-        {"Update": sender_update},
-        {"Update": receiver_update},
-        {"Put": conditional_put(debit)},
-        {"Put": conditional_put(credit)},
-        {"Put": conditional_put(outbox)},
-        {"Put": conditional_put(idempotency_record)},
-    ]
+    store.set(cache.profile_key(subject), profile, PROFILE_TTL_SECONDS)
+    return profile
 
 
-def dynamodb_item_value(attribute: dict):
-    if "N" in attribute:
-        return Decimal(attribute["N"])
-    if "S" in attribute:
-        return attribute["S"]
-    return None
+def public_profile(profile: dict) -> dict:
+    return {key: value for key, value in profile.items() if key != "alert_subscription_arn"}
 
 
-def transfer_failure_response(
-    error: ClientError,
-    idempotency_key: str,
-    sender_account_id: str,
-    requested_amount: Decimal,
-):
-    error_code = error.response.get("Error", {}).get("Code")
-    if error_code != "TransactionCanceledException":
-        raise error
-
-    table_name = required_setting(settings.ledger_table_name, "LEDGER_TABLE_NAME")
-    client = dynamodb_client()
-    existing_key = client.get_item(
-        TableName=table_name,
-        Key=serialize_item({"PK": f"IDEMPOTENCY#{idempotency_key}", "SK": "TRANSFER"}),
-        ConsistentRead=True,
-    ).get("Item")
-    if existing_key:
-        raise HTTPException(status_code=409, detail="Idempotency-Key has already been used") from error
-
-    balance_item = client.get_item(
-        TableName=table_name,
-        Key=serialize_item({"PK": f"ACCOUNT#{sender_account_id}", "SK": "BALANCE"}),
-        ConsistentRead=True,
-    ).get("Item")
-    if balance_item is None:
-        raise HTTPException(status_code=404, detail="Sender account was not found") from error
-
-    balance = dynamodb_item_value(balance_item.get("balance", {}))
-    if balance is not None and balance < requested_amount:
-        raise HTTPException(status_code=400, detail="Insufficient funds") from error
-
-    reasons = error.response.get("CancellationReasons", [])
-    if reasons and reasons[0].get("Code") == "ConditionalCheckFailed":
-        raise HTTPException(status_code=400, detail="Insufficient funds") from error
-    raise HTTPException(status_code=409, detail="Transfer could not be completed") from error
+def require_profile(user: AuthenticatedUser) -> dict:
+    profile = load_profile(user.subject)
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "profile_required", "message": "Complete your profile to continue."},
+        )
+    return profile
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+def require_verified_identity(profile: dict) -> None:
+    if profile["kyc_status"] != "VERIFIED_MOCK":
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "kyc_required", "message": "Verify your identity before moving money."},
+        )
 
 
-@app.post("/accounts", status_code=201)
-def create_account(request: AccountCreate):
-    user_id = str(uuid.uuid4())
-    account_id = str(uuid.uuid4())
-    table = dynamodb_table()
-    ledger_item = {
-        "PK": f"ACCOUNT#{account_id}",
-        "SK": "BALANCE",
-        "record_type": "ACCOUNT_BALANCE",
-        "account_id": account_id,
-        "balance": Decimal("1000.00"),
-        "currency": "USD",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    ledger_item_created = False
+def invalidate_profile(subject: str) -> None:
+    cache.get_cache().delete(cache.profile_key(subject))
 
+
+def require_owned_account(account_id: str, user: AuthenticatedUser, consistent: bool = False) -> dict | None:
+    """Confirm the caller owns the account. Returns the balance item when it was read."""
+    account_id = validate_uuid(account_id)
+    store = cache.get_cache()
+    if not consistent and store.get(cache.owner_key(account_id)) == user.subject:
+        return None
+    item = ledger.get_balance_item(account_id, consistent=consistent)
+    if not item or item.get("record_type") != "ACCOUNT_BALANCE" or item.get("owner_sub") != user.subject:
+        raise HTTPException(status_code=404, detail="Account was not found")
+    store.set(cache.owner_key(account_id), user.subject, OWNER_TTL_SECONDS)
+    return item
+
+
+def parse_idempotency_key(value: str | None) -> str:
+    if not value or not value.strip():
+        raise HTTPException(status_code=400, detail="Idempotency-Key header is required")
+    value = value.strip()
+    if not IDEMPOTENCY_KEY.fullmatch(value):
+        raise HTTPException(
+            status_code=400,
+            detail="Idempotency-Key must be 8-128 letters, digits, '.', '_', ':' or '-'",
+        )
+    return value
+
+
+def ledger_response(result: ledger.LedgerResult) -> JSONResponse:
+    headers = {"Idempotent-Replayed": "true"} if result.replayed else {}
+    return JSONResponse(status_code=result.status_code, content=result.body, headers=headers)
+
+
+def verified_email(user: AuthenticatedUser) -> str:
     try:
-        with connect_database() as connection:
-            ensure_database_schema(connection)
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO customers (user_id, full_name, email) VALUES (%s, %s, %s)",
-                    (user_id, request.full_name, request.email),
-                )
-                cursor.execute(
-                    "INSERT INTO accounts (account_id, user_id, kyc_status) "
-                    "VALUES (%s, %s, 'PENDING')",
-                    (account_id, user_id),
-                )
-            table.put_item(
-                Item=ledger_item,
-                ConditionExpression="attribute_not_exists(PK) AND attribute_not_exists(SK)",
-            )
-            ledger_item_created = True
-    except UniqueViolation as error:
-        if ledger_item_created:
-            try:
-                table.delete_item(Key={"PK": ledger_item["PK"], "SK": ledger_item["SK"]})
-            except ClientError:
-                logger.exception("Could not remove initial balance after account creation failed")
-        raise HTTPException(status_code=409, detail="A customer with this email already exists") from error
+        response = cognito_client().get_user(AccessToken=user.access_token)
     except ClientError as error:
-        if ledger_item_created:
-            try:
-                table.delete_item(Key={"PK": ledger_item["PK"], "SK": ledger_item["SK"]})
-            except ClientError:
-                logger.exception("Could not remove initial balance after account creation failed")
-        if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
-            raise HTTPException(status_code=409, detail="Account identifier already exists") from error
-        raise
-    except Exception:
-        if ledger_item_created:
-            try:
-                table.delete_item(Key={"PK": ledger_item["PK"], "SK": ledger_item["SK"]})
-            except ClientError:
-                logger.exception("Could not remove initial balance after account creation failed")
-        raise
+        raise HTTPException(status_code=401, detail="Sign in again to continue") from error
+    attributes = {item["Name"]: item["Value"] for item in response.get("UserAttributes", [])}
+    if not attributes.get("email") or attributes.get("email_verified") != "true":
+        raise HTTPException(status_code=403, detail="Verify your email address first")
+    return attributes["email"].strip().lower()
 
+
+def serialize_entry(item: dict) -> dict:
     return {
-        "customer_id": user_id,
-        "account_id": account_id,
-        "balance": "1000.00",
-        "currency": "USD",
-        "kyc_status": "PENDING",
+        "transaction_id": item.get("transaction_id") or item.get("transfer_id"),
+        "transfer_id": item.get("transfer_id"),
+        "transaction_type": item.get("transaction_type", "TRANSFER"),
+        "entry_type": item.get("entry_type"),
+        "amount": ledger.money(item.get("amount", Decimal("0"))),
+        "currency": item.get("currency", config.settings.currency),
+        "counterparty_account_id": item.get("counterparty_account_id"),
+        "status": item.get("status", "COMPLETED"),
+        "external_reference": item.get("external_reference"),
+        "created_at": item.get("created_at"),
     }
 
 
-@app.post("/kyc/upload")
-async def upload_kyc_document(
-    account_id: str,
-    file: UploadFile = File(...),
-):
+@app.get("/health", name="health")
+def health():
+    settings = config.settings
+    return {"status": "ok", "version": settings.app_version, "environment": settings.environment}
+
+
+@app.get("/me", name="profile")
+def get_profile(user: AuthenticatedUser = Depends(current_user)):
+    return public_profile(require_profile(user))
+
+
+@app.post("/me", status_code=201, name="create_profile")
+def create_profile(request: ProfileCreate, user: AuthenticatedUser = Depends(current_user)):
+    existing = load_profile(user.subject, use_cache=False)
+    if existing:
+        return JSONResponse(status_code=200, content=public_profile(existing))
+    email = verified_email(user)
+    try:
+        with db.primary.connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO customers (user_id, cognito_sub, full_name, email) VALUES (%s, %s, %s, %s)",
+                (str(uuid.uuid4()), user.subject, request.full_name, email),
+            )
+    except UniqueViolation as error:
+        raise HTTPException(status_code=409, detail="A customer with this email already exists") from error
+    invalidate_profile(user.subject)
+    return public_profile(load_profile(user.subject, use_cache=False))
+
+
+@app.get("/accounts", name="list_accounts")
+def list_accounts(user: AuthenticatedUser = Depends(current_user)):
+    return {"accounts": require_profile(user)["accounts"]}
+
+
+@app.post("/accounts", status_code=201, name="open_account")
+def open_account(request: AccountCreate, user: AuthenticatedUser = Depends(current_user)):
+    profile = require_profile(user)
+    if len(profile["accounts"]) >= MAX_ACCOUNTS_PER_CUSTOMER:
+        raise HTTPException(status_code=409, detail="You can hold up to five accounts")
+    account_id = str(uuid.uuid4())
+    currency = config.settings.currency
+    ledger.create_account_balance(account_id, user.subject, profile["customer_id"], request.account_type, currency)
+    try:
+        with db.primary.connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO accounts (account_id, user_id, kyc_status, account_type, nickname, currency) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (account_id, profile["customer_id"], profile["kyc_status"], request.account_type, request.nickname, currency),
+            )
+    except Exception:
+        try:
+            ledger.delete_account_balance(account_id)
+        except ClientError:
+            logger.exception("Could not remove balance item for account %s after a database failure", account_id)
+        raise
+    invalidate_profile(user.subject)
+    cache.get_cache().set(cache.owner_key(account_id), user.subject, OWNER_TTL_SECONDS)
+    return {
+        "account_id": account_id,
+        "account_type": request.account_type,
+        "nickname": request.nickname,
+        "currency": currency,
+        "balance": "0.00",
+    }
+
+
+@app.post("/kyc/upload", name="kyc_upload")
+def upload_kyc_document(file: UploadFile = File(...), user: AuthenticatedUser = Depends(current_user)):
+    settings = config.settings
     bucket = required_setting(settings.kyc_statements_bucket, "KYC_STATEMENTS_BUCKET")
-    contents = await file.read(settings.max_upload_bytes + 1)
+    profile = require_profile(user)
+    contents = file.file.read(settings.max_upload_bytes + 1)
     if not contents:
         raise HTTPException(status_code=400, detail="The uploaded file is empty")
     if len(contents) > settings.max_upload_bytes:
         raise HTTPException(status_code=413, detail="KYC document exceeds the 10 MiB limit")
+    content_type = (file.content_type or "").lower()
+    signatures = KYC_SIGNATURES.get(content_type)
+    if signatures is None:
+        raise HTTPException(status_code=415, detail="Upload a PDF, PNG or JPG document")
+    if not contents.startswith(signatures):
+        raise HTTPException(status_code=415, detail="The file content does not match its type")
 
-    safe_name = PurePosixPath(file.filename.replace("\\", "/") if file.filename else "document").name
-    object_key = f"kyc/{account_id}/{uuid.uuid4()}-{safe_name}"
+    safe_name = PurePosixPath((file.filename or "document").replace("\\", "/")).name[:100]
+    object_key = f"kyc/{profile['customer_id']}/{uuid.uuid4()}-{safe_name}"
     s3_client().put_object(
         Bucket=bucket,
         Key=object_key,
         Body=contents,
-        ContentType=file.content_type or "application/octet-stream",
+        ContentType=content_type,
         ServerSideEncryption="aws:kms",
     )
-
     try:
-        with connect_database() as connection:
-            ensure_database_schema(connection)
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE accounts SET kyc_status = 'VERIFIED_MOCK' "
-                    "WHERE account_id = %s RETURNING account_id",
-                    (account_id,),
-                )
-                account = cursor.fetchone()
-                if account is None:
-                    raise HTTPException(status_code=404, detail="Account was not found")
+        with db.primary.connection() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE customers SET kyc_status = 'VERIFIED_MOCK', kyc_document_key = %s, "
+                "kyc_verified_at = NOW() WHERE cognito_sub = %s RETURNING user_id",
+                (object_key, user.subject),
+            )
+            customer = cursor.fetchone()
+            if customer is None:
+                raise HTTPException(status_code=404, detail="Customer profile was not found")
+            cursor.execute(
+                "UPDATE accounts SET kyc_status = 'VERIFIED_MOCK' WHERE user_id = %s",
+                (customer["user_id"],),
+            )
     except Exception:
         try:
             s3_client().delete_object(Bucket=bucket, Key=object_key)
         except ClientError:
-            logger.exception("Could not remove KYC object after database update failed")
+            logger.exception("Could not remove KYC object after the database update failed")
         raise
+    invalidate_profile(user.subject)
+    return {"kyc_status": "VERIFIED_MOCK", "verification": "simulated", "document_key": object_key}
 
+
+@app.get("/accounts/{account_id}/balance", name="balance")
+def get_account_balance(account_id: str, user: AuthenticatedUser = Depends(current_user)):
+    item = require_owned_account(account_id, user, consistent=True)
     return {
-        "account_id": account_id,
-        "kyc_status": "VERIFIED_MOCK",
-        "document_key": object_key,
+        "account_id": item["account_id"],
+        "balance": ledger.money(item["balance"]),
+        "currency": item.get("currency", config.settings.currency),
+        "as_of": item.get("updated_at"),
     }
 
 
-@app.post("/transfers", status_code=201)
-def create_transfer(
-    request: TransferRequest,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
-):
-    if not idempotency_key or not idempotency_key.strip():
-        raise HTTPException(status_code=400, detail="Idempotency-Key header is required")
-    idempotency_key = idempotency_key.strip()
-    if len(idempotency_key) > 128:
-        raise HTTPException(status_code=400, detail="Idempotency-Key must be 128 characters or fewer")
-    if request.sender_account_id == request.receiver_account_id:
-        raise HTTPException(status_code=400, detail="Sender and receiver accounts must differ")
-
-    fraud_score = mock_fraud_score(request.amount)
-    if fraud_score >= Decimal("0.90"):
-        raise HTTPException(status_code=403, detail="Transfer rejected by mock fraud screening")
-
-    transfer_id = str(uuid.uuid4())
-    timestamp = datetime.now(timezone.utc).isoformat(timespec="microseconds")
-    client = dynamodb_client()
-    try:
-        client.transact_write_items(
-            TransactItems=build_transfer_items(
-                sender_account_id=request.sender_account_id,
-                receiver_account_id=request.receiver_account_id,
-                amount=request.amount,
-                idempotency_key=idempotency_key,
-                transfer_id=transfer_id,
-                timestamp=timestamp,
-            )
-        )
-    except ClientError as error:
-        transfer_failure_response(
-            error,
-            idempotency_key,
-            request.sender_account_id,
-            request.amount,
-        )
-
-    return {
-        "transfer_id": transfer_id,
-        "status": "COMPLETED",
-        "amount": decimal_string(request.amount),
-        "currency": "USD",
-        "fraud_score": float(fraud_score),
-        "created_at": timestamp,
-    }
-
-
-@app.get("/accounts/{account_id}/balance")
-def get_account_balance(account_id: str):
-    result = dynamodb_table().get_item(
-        Key={"PK": f"ACCOUNT#{account_id}", "SK": "BALANCE"},
-        ConsistentRead=True,
-    )
-    item = result.get("Item")
-    if item is None:
-        raise HTTPException(status_code=404, detail="Account was not found")
-    return {
-        "account_id": account_id,
-        "balance": decimal_string(Decimal(item["balance"])),
-        "currency": item.get("currency", "USD"),
-    }
-
-
-@app.get("/accounts/{account_id}/transactions")
-def get_account_transactions(account_id: str, limit: int = 50):
+@app.get("/accounts/{account_id}/transactions", name="transactions")
+def get_account_transactions(account_id: str, limit: int = 50, user: AuthenticatedUser = Depends(current_user)):
     if not 1 <= limit <= 100:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 100")
-    result = dynamodb_table().query(
-        KeyConditionExpression="PK = :pk AND begins_with(SK, :txn_prefix)",
-        ExpressionAttributeValues={
-            ":pk": f"ACCOUNT#{account_id}",
-            ":txn_prefix": "TXN#",
+    require_owned_account(account_id, user)
+    entries = ledger.list_transactions(validate_uuid(account_id), limit)
+    return {"account_id": account_id, "transactions": [serialize_entry(entry) for entry in entries]}
+
+
+@app.post("/transfers", status_code=201, name="transfer")
+def create_transfer(
+    request: TransferRequest,
+    user: AuthenticatedUser = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    key = parse_idempotency_key(idempotency_key)
+    if request.sender_account_id == request.receiver_account_id:
+        raise HTTPException(status_code=400, detail="Sender and receiver accounts must differ")
+    require_verified_identity(require_profile(user))
+
+    fingerprint = ledger.request_fingerprint(
+        "TRANSFER",
+        {
+            "sender": request.sender_account_id,
+            "receiver": request.receiver_account_id,
+            "amount": ledger.money(request.amount),
         },
-        ConsistentRead=False,
-        ScanIndexForward=False,
-        Limit=limit,
     )
-    transactions = result.get("Items", [])
-    for transaction in transactions:
-        if "amount" in transaction:
-            transaction["amount"] = decimal_string(Decimal(transaction["amount"]))
-    return {"account_id": account_id, "transactions": transactions}
+    previous = ledger.find_previous_result(user.subject, key, "TRANSFER", fingerprint)
+    if previous:
+        return ledger_response(previous)
+
+    sender = ledger.get_balance_item(request.sender_account_id)
+    if not sender or sender.get("owner_sub") != user.subject:
+        raise HTTPException(status_code=404, detail="Account was not found")
+    receiver = ledger.get_balance_item(request.receiver_account_id)
+    if not receiver or receiver.get("record_type") != "ACCOUNT_BALANCE":
+        raise HTTPException(status_code=404, detail="Recipient account was not found")
+
+    features = fraud.extract_features(
+        request.amount,
+        Decimal(str(sender.get("balance", "0"))),
+        request.receiver_account_id,
+        ledger.list_transactions(request.sender_account_id, 50),
+    )
+    score = fraud.score_transfer(features)
+    logger.info(
+        "Fraud screening transfer key=%s score=%.4f model=%s decision=%s",
+        key,
+        score.score,
+        score.model,
+        score.decision,
+    )
+    if score.decision == "BLOCK":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "fraud_blocked",
+                "message": "This transfer was blocked by fraud screening. Contact us if this was you.",
+            },
+        )
+    if request.amount >= config.settings.step_up_amount:
+        auth.require_recent_authentication(user, "high_value_transfer")
+    elif score.decision == "STEP_UP":
+        auth.require_recent_authentication(user, "unusual_transfer")
+
+    result = ledger.execute_transfer(
+        subject=user.subject,
+        key=key,
+        fingerprint=fingerprint,
+        sender_account_id=request.sender_account_id,
+        receiver_account_id=request.receiver_account_id,
+        receiver_subject=str(receiver.get("owner_sub", "")),
+        amount=request.amount,
+        currency=str(sender.get("currency", config.settings.currency)),
+        fraud_score=score.score,
+        fraud_model=score.model,
+    )
+    return ledger_response(result)
 
 
-@app.post("/statements/request", status_code=202)
-def request_statement(request: StatementRequest):
-    queue_url = required_setting(settings.statement_queue_url, "STATEMENT_QUEUE_URL")
-    job_id = str(uuid.uuid4())
-    message = {
-        "job_id": job_id,
+@app.get("/external-banks", name="external_banks")
+def list_external_banks(user: AuthenticatedUser = Depends(current_user)):
+    return {
+        "banks": [{"code": code, "name": name} for code, name in external_bank.PARTNER_BANKS.items()],
+        "partner_limit": ledger.money(external_bank.PARTNER_LIMIT),
+        "simulated": True,
+    }
+
+
+def _external_setup(account_id: str, request: ExternalTransferRequest, user: AuthenticatedUser, operation: str, key: str):
+    require_verified_identity(require_profile(user))
+    account_id = validate_uuid(account_id)
+    require_owned_account(account_id, user)
+    invalid = external_bank.validate_destination(request.bank_code, request.external_account)
+    if invalid:
+        raise HTTPException(status_code=400, detail=invalid)
+    fingerprint = ledger.request_fingerprint(
+        operation,
+        {
+            "account": account_id,
+            "amount": ledger.money(request.amount),
+            "bank": request.bank_code,
+            "external_account": request.external_account,
+        },
+    )
+    return account_id, fingerprint, ledger.find_previous_result(user.subject, key, operation, fingerprint)
+
+
+@app.post("/accounts/{account_id}/deposits", status_code=201, name="deposit")
+def create_deposit(
+    account_id: str,
+    request: ExternalTransferRequest,
+    user: AuthenticatedUser = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    key = parse_idempotency_key(idempotency_key)
+    account_id, fingerprint, previous = _external_setup(account_id, request, user, "DEPOSIT", key)
+    if previous:
+        return ledger_response(previous)
+    bank = external_bank.pull_funds(request.bank_code, request.external_account, request.amount, f"{user.subject}:{key}")
+    if not bank.approved:
+        raise HTTPException(status_code=422, detail=f"Deposit declined by the partner bank: {bank.reason}")
+    result = ledger.execute_deposit(
+        subject=user.subject,
+        key=key,
+        fingerprint=fingerprint,
+        account_id=account_id,
+        amount=request.amount,
+        currency=config.settings.currency,
+        bank_code=request.bank_code,
+        external_reference=bank.reference,
+    )
+    return ledger_response(result)
+
+
+@app.post("/accounts/{account_id}/withdrawals", status_code=201, name="withdrawal")
+def create_withdrawal(
+    account_id: str,
+    request: ExternalTransferRequest,
+    user: AuthenticatedUser = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
+    key = parse_idempotency_key(idempotency_key)
+    account_id, fingerprint, previous = _external_setup(account_id, request, user, "WITHDRAWAL", key)
+    if previous:
+        return ledger_response(previous)
+    if request.amount >= config.settings.step_up_amount:
+        auth.require_recent_authentication(user, "high_value_withdrawal")
+
+    pending = ledger.begin_withdrawal(
+        subject=user.subject,
+        key=key,
+        fingerprint=fingerprint,
+        account_id=account_id,
+        amount=request.amount,
+        currency=config.settings.currency,
+        bank_code=request.bank_code,
+    )
+    if isinstance(pending, ledger.LedgerResult):
+        return ledger_response(pending)
+    bank = external_bank.push_funds(request.bank_code, request.external_account, request.amount, f"{user.subject}:{key}")
+    if bank.approved:
+        result = ledger.complete_withdrawal(pending, bank.reference)
+    else:
+        result = ledger.reverse_withdrawal(pending, bank.reason or "Declined")
+    return ledger_response(result)
+
+
+def statement_view(job: dict, include_url: bool = False) -> dict:
+    view = {
+        "job_id": job["job_id"],
+        "account_id": job["account_id"],
+        "status": job.get("status", "QUEUED"),
+        "type": job.get("type", "ON_DEMAND"),
+        "start_date": job.get("start_date"),
+        "end_date": job.get("end_date"),
+        "requested_at": job.get("requested_at"),
+        "completed_at": job.get("completed_at"),
+    }
+    if include_url and view["status"] == "COMPLETED" and job.get("object_key"):
+        filename = f"facaibank-statement-{(job.get('completed_at') or '')[:10] or job['job_id'][:8]}.pdf"
+        view["download_url"] = s3_client().generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": required_setting(config.settings.kyc_statements_bucket, "KYC_STATEMENTS_BUCKET"),
+                "Key": job["object_key"],
+                "ResponseContentDisposition": f'attachment; filename="{filename}"',
+            },
+            ExpiresIn=config.settings.statement_url_ttl_seconds,
+        )
+        view["download_url_expires_in"] = config.settings.statement_url_ttl_seconds
+    return view
+
+
+@app.post("/statements/request", status_code=202, name="request_statement")
+def request_statement(request: StatementRequest, user: AuthenticatedUser = Depends(current_user)):
+    queue_url = required_setting(config.settings.statement_queue_url, "STATEMENT_QUEUE_URL")
+    require_owned_account(request.account_id, user)
+    job = {
+        "job_id": str(uuid.uuid4()),
         "account_id": request.account_id,
+        "owner_sub": user.subject,
+        "type": "ON_DEMAND",
         "start_date": request.start_date.isoformat() if request.start_date else None,
         "end_date": request.end_date.isoformat() if request.end_date else None,
         "requested_at": datetime.now(timezone.utc).isoformat(),
     }
-    sqs_client().send_message(
-        QueueUrl=queue_url,
-        MessageBody=json.dumps(message, separators=(",", ":")),
+    ledger.put_statement_job(job)
+    sqs_client().send_message(QueueUrl=queue_url, MessageBody=json.dumps(job, separators=(",", ":")))
+    return {"job_id": job["job_id"], "account_id": request.account_id, "status": "QUEUED"}
+
+
+@app.get("/accounts/{account_id}/statements", name="list_statements")
+def list_statements(account_id: str, user: AuthenticatedUser = Depends(current_user)):
+    require_owned_account(account_id, user)
+    jobs = ledger.list_statement_jobs(validate_uuid(account_id))
+    return {"statements": [statement_view(job) for job in jobs]}
+
+
+@app.get("/accounts/{account_id}/statements/{job_id}", name="statement")
+def get_statement(account_id: str, job_id: str, user: AuthenticatedUser = Depends(current_user)):
+    require_owned_account(account_id, user)
+    job = ledger.get_statement_job(validate_uuid(account_id), validate_uuid(job_id, "Statement"))
+    if not job or job.get("owner_sub") != user.subject:
+        raise HTTPException(status_code=404, detail="Statement was not found")
+    return statement_view(job, include_url=True)
+
+
+def subscription_status(subscription_arn: str | None) -> str:
+    if not subscription_arn or not subscription_arn.startswith("arn:"):
+        return "NONE"
+    try:
+        attributes = sns_client().get_subscription_attributes(SubscriptionArn=subscription_arn)["Attributes"]
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") in {"NotFound", "NotFoundException"}:
+            return "NONE"
+        raise
+    return "PENDING_CONFIRMATION" if attributes.get("PendingConfirmation") == "true" else "ACTIVE"
+
+
+@app.get("/me/alerts", name="alert_status")
+def get_alert_status(user: AuthenticatedUser = Depends(current_user)):
+    profile = require_profile(user)
+    return {"status": subscription_status(profile.get("alert_subscription_arn")), "email": profile["email"]}
+
+
+@app.post("/me/alerts", status_code=202, name="subscribe_alerts")
+def subscribe_alerts(user: AuthenticatedUser = Depends(current_user)):
+    topic_arn = required_setting(config.settings.notifications_topic_arn, "NOTIFICATIONS_TOPIC_ARN")
+    profile = require_profile(user)
+    status = subscription_status(profile.get("alert_subscription_arn"))
+    if status != "NONE":
+        return {"status": status, "email": profile["email"]}
+    response = sns_client().subscribe(
+        TopicArn=topic_arn,
+        Protocol="email",
+        Endpoint=profile["email"],
+        Attributes={
+            "FilterPolicy": json.dumps({"customer_sub": [user.subject]}),
+            "FilterPolicyScope": "MessageAttributes",
+        },
+        ReturnSubscriptionArn=True,
     )
-    return {"job_id": job_id, "status": "QUEUED"}
+    with db.primary.connection() as conn, conn.cursor() as cursor:
+        cursor.execute(
+            "UPDATE customers SET alert_subscription_arn = %s WHERE cognito_sub = %s",
+            (response["SubscriptionArn"], user.subject),
+        )
+    invalidate_profile(user.subject)
+    return {"status": "PENDING_CONFIRMATION", "email": profile["email"]}
+
+
+@app.post("/auth/logout", status_code=204, name="logout")
+def logout(user: AuthenticatedUser = Depends(current_user)):
+    auth.revoke_session(user)
+    return Response(status_code=204)
