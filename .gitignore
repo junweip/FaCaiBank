@@ -5,4 +5,9 @@ __pycache__/
 *.tfstate
 *.tfstate.*
 crash.log
-crash.*.log
+crash.*.log.pytest_cache/
+*.tfplan
+infra/backend.hcl
+infra/bootstrap/.terraform/
+infra/bootstrap/terraform.tfstate*
+.DS_Store
