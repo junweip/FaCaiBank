@@ -389,3 +389,9 @@ variable "slack_webhook_url" {
   default     = ""
   sensitive   = true
 }
+
+variable "enable_office_hours_schedule" {
+  description = "Scale every fleet to zero and stop RDS overnight (23:00-08:00 SGT, and weekends). Development only."
+  type        = bool
+  default     = false
+}

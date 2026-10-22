@@ -30,6 +30,9 @@ enable_config          = true
 enable_vpc_flow_logs   = true
 audit_object_lock_mode = "GOVERNANCE"
 
+# Turn on to save roughly a third of EC2 and RDS cost while nobody is working.
+enable_office_hours_schedule = false
+
 # Optional services stay off in dev.
 enable_sagemaker_fraud   = false
 enable_analytics         = false

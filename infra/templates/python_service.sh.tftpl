@@ -63,6 +63,7 @@ ROTATE
 
 cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWAGENT'
 {
+  "agent": {"omit_hostname": true},
   "logs": {
     "logs_collected": {
       "files": {

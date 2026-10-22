@@ -19,6 +19,9 @@ from . import config
 logger = logging.getLogger(__name__)
 MAX_VALUES_PER_DATUM = 150
 MAX_DATA_PER_CALL = 1000
+# Each endpoint dimension is a billable custom metric, so only the endpoints the
+# alarms and dashboard use are tracked individually; the rest roll up to "other".
+TRACKED_ENDPOINTS = {"balance", "transfer", "transactions", "deposit", "withdrawal", "profile"}
 
 
 class LatencyRecorder:
@@ -36,8 +39,9 @@ class LatencyRecorder:
         self._client = None
 
     def record(self, endpoint: str, millis: float, status_code: int) -> None:
-        if not self.enabled:
+        if not self.enabled or endpoint == "health":
             return
+        endpoint = endpoint if endpoint in TRACKED_ENDPOINTS else "other"
         with self._lock:
             self._latencies[endpoint][max(1, round(millis))] += 1
             self._requests[endpoint] += 1

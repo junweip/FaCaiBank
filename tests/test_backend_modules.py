@@ -77,6 +77,8 @@ def test_latency_recorder_publishes_raw_values_for_percentiles():
     for millis in (12.4, 12.6, 180.0, 950.0):
         recorder.record("balance", millis, 200)
     recorder.record("transfer", 400.0, 503)
+    recorder.record("open_account", 30.0, 201)
+    recorder.record("health", 1.0, 200)
 
     data = {(datum["MetricName"], datum["Dimensions"][1]["Value"]): datum for datum in recorder.drain()}
 
@@ -85,6 +87,8 @@ def test_latency_recorder_publishes_raw_values_for_percentiles():
     assert latency["Counts"] == [1.0, 1.0, 1.0, 1.0]
     assert data[("Requests", "balance")]["Value"] == 4
     assert data[("Errors5xx", "transfer")]["Value"] == 1
+    assert data[("Requests", "other")]["Value"] == 1
+    assert not any(endpoint == "health" for _, endpoint in data)
     assert recorder.drain() == []
 
 
