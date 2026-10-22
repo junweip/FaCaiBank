@@ -1,33 +1,72 @@
 #!/bin/bash
+# Bootstraps the frontend web tier: nginx serves the page shell and proxies /api
+# to the internal ALB. CloudFront serves /assets/* straight from S3.
 set -euo pipefail
 exec > >(tee /var/log/facaibank-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
 
-dnf install -y nginx python3.12 unzip
-mkdir -p /opt/facaibank
+dnf install -y nginx unzip amazon-cloudwatch-agent
 aws s3 cp "s3://${bucket_name}/${bundle_key}" /tmp/frontend.zip --region "${aws_region}"
+rm -rf /usr/share/nginx/html/*
 unzip -q -o /tmp/frontend.zip -d /usr/share/nginx/html
-printf 'window.FACAI_API_BASE = "/api";\n' > /usr/share/nginx/html/config.js
-python3.12 -c 'from pathlib import Path; path=Path("/usr/share/nginx/html/index.html"); text=path.read_text(); text=text.replace("<script src=\"./config.js\"></script>", "<script src=\"/config.js\"></script>"); text=text.replace("<script src=\"./app.js\" defer></script>", "<script src=\"/app.js\" defer></script>"); path.write_text(text)'
+cat > /usr/share/nginx/html/assets/config.js <<'CONFIG'
+${frontend_config}
+CONFIG
+
 cat > /etc/nginx/conf.d/facaibank.conf <<'NGINX'
 server {
     listen 8080 default_server;
     server_name _;
+    server_tokens off;
     root /usr/share/nginx/html;
     index index.html;
+    client_max_body_size 11m;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
 
     location /api/ {
         proxy_pass http://${internal_alb_dns}/;
         proxy_http_version 1.1;
+        proxy_read_timeout 30s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
     }
 
+    location /assets/ {
+        add_header Cache-Control "public, max-age=300";
+    }
+
     location / {
+        add_header Cache-Control "no-store";
+        add_header X-Content-Type-Options "nosniff";
+        add_header X-Frame-Options "DENY";
         try_files $uri $uri/ /index.html;
     }
 }
 NGINX
 rm -f /etc/nginx/conf.d/ssl.conf
+
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWAGENT'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {"file_path": "/var/log/nginx/access.log", "log_group_name": "${log_group}", "log_stream_name": "{instance_id}-access"},
+          {"file_path": "/var/log/nginx/error.log", "log_group_name": "${log_group}", "log_stream_name": "{instance_id}-error"},
+          {"file_path": "/var/log/facaibank-bootstrap.log", "log_group_name": "${log_group}", "log_stream_name": "{instance_id}-bootstrap"}
+        ]
+      }
+    }
+  }
+}
+CWAGENT
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
 systemctl enable --now nginx

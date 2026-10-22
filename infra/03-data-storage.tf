@@ -23,11 +23,15 @@ resource "aws_db_instance" "main" {
   publicly_accessible           = false
   storage_encrypted             = true
   kms_key_id                    = aws_kms_key.main.arn
-  backup_retention_period       = 7
+  backup_retention_period       = var.db_backup_retention_days
+  backup_window                 = "18:00-19:00"
+  maintenance_window            = "sun:19:30-sun:20:30"
   auto_minor_version_upgrade    = true
-  deletion_protection           = false
-  skip_final_snapshot           = true
+  deletion_protection           = var.deletion_protection
+  skip_final_snapshot           = !var.deletion_protection
+  final_snapshot_identifier     = var.deletion_protection ? "facaibank-${var.env}-postgres-final" : null
   copy_tags_to_snapshot         = true
+  apply_immediately             = true
 
   tags = {
     Name = "facaibank-${var.env}-postgres"
@@ -51,12 +55,25 @@ resource "aws_dynamodb_table" "ledger" {
     type = "S"
   }
 
-  stream_enabled   = true
-  stream_view_type = "NEW_IMAGE"
+  stream_enabled              = true
+  stream_view_type            = "NEW_IMAGE"
+  deletion_protection_enabled = var.deletion_protection
 
   server_side_encryption {
     enabled     = true
     kms_key_arn = aws_kms_key.main.arn
+  }
+
+  # Continuous backups: restore to any second in the last 35 days (RPO 0 for
+  # committed writes) and the source for analytics exports.
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  # Idempotency, dedupe and outbox records expire; ledger entries never set it.
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
   }
 
   tags = {
@@ -65,10 +82,42 @@ resource "aws_dynamodb_table" "ledger" {
   }
 }
 
+resource "aws_dynamodb_table" "outbox_leases" {
+  name         = "facaibank-${var.env}-outbox-leases"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.main.arn
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = {
+    Name = "facaibank-${var.env}-outbox-leases"
+    Tier = "data"
+  }
+}
+
 locals {
-  account_id   = data.aws_caller_identity.current.account_id
-  kyc_bucket   = "facaibank-${var.env}-kyc-statements-${local.account_id}-${var.aws_region}"
-  audit_bucket = "facaibank-${var.env}-cloudtrail-audit-${local.account_id}-${var.aws_region}"
+  kyc_bucket       = "facaibank-${var.env}-kyc-statements-${local.account_id}-${var.aws_region}"
+  audit_bucket     = "facaibank-${var.env}-cloudtrail-audit-${local.account_id}-${var.aws_region}"
+  artifacts_bucket = "facaibank-${var.env}-artifacts-${local.account_id}-${var.aws_region}"
 }
 
 resource "aws_s3_bucket" "kyc_statements" {
@@ -118,8 +167,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "kyc_statements" {
     filter {}
 
     transition {
-      days          = 1825
+      days          = var.audit_retention_days
       storage_class = "GLACIER"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
     }
   }
 }
@@ -167,8 +220,8 @@ resource "aws_s3_bucket_object_lock_configuration" "audit" {
 
   rule {
     default_retention {
-      mode = "COMPLIANCE"
-      days = 1825
+      mode = var.audit_object_lock_mode
+      days = var.audit_retention_days
     }
   }
 
@@ -185,12 +238,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "audit" {
     filter {}
 
     transition {
-      days          = 1
+      days          = 90
       storage_class = "DEEP_ARCHIVE"
     }
 
     expiration {
-      days = 1825
+      days = var.audit_retention_days
     }
   }
 }
@@ -245,6 +298,48 @@ data "aws_iam_policy_document" "audit_bucket" {
   }
 
   statement {
+    sid       = "AllowConfigBucketChecks"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketAcl", "s3:ListBucket"]
+    resources = [aws_s3_bucket.audit.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
+    }
+  }
+
+  statement {
+    sid       = "AllowConfigDelivery"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.audit.arn}/config/AWSLogs/${local.account_id}/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
+    }
+  }
+
+  statement {
     sid       = "DenyInsecureTransport"
     effect    = "Deny"
     actions   = ["s3:*"]
@@ -291,4 +386,74 @@ data "aws_iam_policy_document" "kyc_bucket" {
 resource "aws_s3_bucket_policy" "kyc_statements" {
   bucket = aws_s3_bucket.kyc_statements.id
   policy = data.aws_iam_policy_document.kyc_bucket.json
+}
+
+# Deployment bundles, Glue scripts and model artifacts are kept apart from
+# customer KYC data so instance roles never need access to the KYC bucket root.
+resource "aws_s3_bucket" "artifacts" {
+  bucket        = local.artifacts_bucket
+  force_destroy = true
+
+  tags = {
+    Name = "facaibank-${var.env}-artifacts"
+    Tier = "deployment"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts" {
+  bucket                  = aws_s3_bucket.artifacts.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.main.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    id     = "expire-old-bundles"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [aws_s3_bucket.artifacts.arn, "${aws_s3_bucket.artifacts.arn}/*"]
+      Condition = { Bool = { "aws:SecureTransport" = "false" } }
+    }]
+  })
 }

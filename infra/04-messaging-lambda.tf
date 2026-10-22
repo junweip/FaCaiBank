@@ -65,6 +65,12 @@ resource "aws_sns_topic" "notifications" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "notifier" {
+  name              = "/facaibank/${var.env}/lambda/notifier"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
+}
+
 resource "aws_iam_role" "notifier" {
   name = "facaibank-${var.env}-lambda-notifier"
 
@@ -162,6 +168,11 @@ resource "aws_lambda_function" "notifier" {
     }
   }
 
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.notifier.name
+  }
+
   depends_on = [aws_iam_role_policy.notifier]
 
   tags = {
@@ -176,4 +187,68 @@ resource "aws_lambda_event_source_mapping" "events" {
   batch_size              = 10
   function_response_types = ["ReportBatchItemFailures"]
   enabled                 = true
+}
+
+# Demo inbox that receives every customer alert (no filter policy). Customers
+# subscribe themselves through the API with a filter on their own identity.
+resource "aws_sns_topic_subscription" "notification_inbox" {
+  count = var.notification_email == "" ? 0 : 1
+
+  topic_arn = aws_sns_topic.notifications.arn
+  protocol  = "email"
+  endpoint  = var.notification_email
+}
+
+# ---------------------------------------------------------------- monthly statements
+
+resource "aws_iam_role" "statement_scheduler" {
+  count = var.enable_monthly_statements ? 1 : 0
+
+  name = "facaibank-${var.env}-statement-scheduler"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "scheduler.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+      Condition = { StringEquals = { "aws:SourceAccount" = local.account_id } }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "statement_scheduler" {
+  count = var.enable_monthly_statements ? 1 : 0
+
+  name = "send-monthly-run"
+  role = aws_iam_role.statement_scheduler[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Effect = "Allow", Action = "sqs:SendMessage", Resource = aws_sqs_queue.statement_jobs.arn },
+      { Effect = "Allow", Action = ["kms:GenerateDataKey", "kms:Decrypt"], Resource = aws_kms_key.main.arn },
+    ]
+  })
+}
+
+resource "aws_scheduler_schedule" "monthly_statements" {
+  count = var.enable_monthly_statements ? 1 : 0
+
+  name                         = "facaibank-${var.env}-monthly-statements"
+  description                  = "Queue last month's statement for every account at 02:00 SGT on the 1st."
+  schedule_expression          = "cron(0 2 1 * ? *)"
+  schedule_expression_timezone = "Asia/Singapore"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_sqs_queue.statement_jobs.arn
+    role_arn = aws_iam_role.statement_scheduler[0].arn
+    input    = jsonencode({ type = "MONTHLY_RUN" })
+
+    retry_policy {
+      maximum_retry_attempts = 3
+    }
+  }
 }

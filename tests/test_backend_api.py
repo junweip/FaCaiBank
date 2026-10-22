@@ -1,316 +1,426 @@
+import json
+import uuid
 from decimal import Decimal
-from uuid import UUID
 
-from botocore.exceptions import ClientError
+import boto3
 from fastapi.testclient import TestClient
 
-from app.backend_api import main
+from app.backend_api import config, fraud, ledger, main
+from conftest import REGION
 
 
 client = TestClient(main.app)
 
 
-class FakeDynamoClient:
-    def __init__(self, transact_error=None, items=None):
-        self.transact_error = transact_error
-        self.items = items or {}
-        self.transact_calls = []
-        self.get_calls = []
-
-    def transact_write_items(self, **kwargs):
-        self.transact_calls.append(kwargs)
-        if self.transact_error:
-            raise self.transact_error
-
-    def get_item(self, **kwargs):
-        self.get_calls.append(kwargs)
-        partition_key = kwargs["Key"]["PK"]["S"]
-        return {"Item": self.items.get(partition_key)}
+def key():
+    return f"test-{uuid.uuid4()}"
 
 
-def configure_dynamo(monkeypatch, fake_client):
-    monkeypatch.setattr(
-        main,
-        "settings",
-        main.Settings(ledger_table_name="test-ledger"),
+def transfer(sender, receiver, amount, idempotency_key=None):
+    return client.post(
+        "/transfers",
+        headers={"Idempotency-Key": idempotency_key or key()},
+        json={"sender_account_id": sender, "receiver_account_id": receiver, "amount": amount},
     )
-    monkeypatch.setattr(main, "dynamodb_client", lambda: fake_client)
 
 
-class FakeCursor:
-    def __init__(self, result=None):
-        self.statements = []
-        self.result = result
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        return False
-
-    def execute(self, statement, parameters=None):
-        self.statements.append((statement, parameters))
-
-    def fetchone(self):
-        return self.result
+def total_ledger_balance(bank):
+    return sum(Decimal(str(item["balance"])) for item in bank.items("ACCOUNT#") if item["SK"] == "BALANCE")
 
 
-class FakeConnection:
-    def __init__(self, cursor):
-        self.fake_cursor = cursor
+def test_health_reports_version():
+    response = client.get("/health")
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        return False
-
-    def cursor(self):
-        return self.fake_cursor
-
-    def commit(self):
-        pass
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert "version" in response.json()
 
 
-def test_transfer_submits_one_atomic_transaction(monkeypatch):
-    fake_client = FakeDynamoClient()
-    configure_dynamo(monkeypatch, fake_client)
-    sender = str(UUID("86a88f7e-f836-495a-991a-22b74fae3331"))
-    receiver = str(UUID("20f6582e-2cd2-4bd7-af7d-796302be57c0"))
+def test_banking_endpoints_require_a_bearer_token():
+    response = client.get(f"/accounts/{uuid.uuid4()}/balance")
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"].startswith("Bearer")
+
+
+def test_open_account_creates_owned_zero_balance_and_metadata(bank):
+    bank.add_customer("user-a")
+
+    response = client.post("/accounts", json={"account_type": "SAVINGS", "nickname": " Rainy  day "})
+
+    assert response.status_code == 201
+    account_id = response.json()["account_id"]
+    item = ledger.get_balance_item(account_id, consistent=True)
+    assert item["owner_sub"] == "user-a"
+    assert item["balance"] == Decimal("0")
+    assert item["currency"] == "SGD"
+    statement, parameters = bank.database.statements[-1]
+    assert statement.startswith("INSERT INTO accounts")
+    assert parameters[3:5] == ("SAVINGS", "Rainy day")
+
+
+def test_open_account_requires_a_profile(bank):
+    response = client.post("/accounts", json={})
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "profile_required"
+
+
+def test_balance_is_strongly_consistent_and_owner_only(bank, monkeypatch):
+    account_id = bank.add_account("user-a", "25.50")
+    calls = []
+    original = ledger.get_balance_item
+    monkeypatch.setattr(
+        ledger,
+        "get_balance_item",
+        lambda account, consistent=False: calls.append(consistent) or original(account, consistent),
+    )
+
+    response = client.get(f"/accounts/{account_id}/balance")
+    assert response.status_code == 200
+    assert response.json()["balance"] == "25.50"
+    assert calls == [True]
+
+    bank.as_user("user-b")
+    assert client.get(f"/accounts/{account_id}/balance").status_code == 404
+    assert client.get("/accounts/not-a-uuid/balance").status_code == 404
+
+
+def test_deposit_credits_account_and_posts_clearing_leg(bank):
+    account_id = bank.add_account("user-a")
+    idempotency_key = key()
 
     response = client.post(
-        "/transfers",
-        headers={"Idempotency-Key": "transfer-001"},
-        json={
-            "sender_account_id": sender,
-            "receiver_account_id": receiver,
-            "amount": "12.35",
-        },
+        f"/accounts/{account_id}/deposits",
+        headers={"Idempotency-Key": idempotency_key},
+        json={"amount": "500.00", "bank_code": "dbs", "external_account": "123456789"},
     )
 
     assert response.status_code == 201
-    assert len(fake_client.transact_calls) == 1
-    operations = fake_client.transact_calls[0]["TransactItems"]
-    assert [next(iter(operation)) for operation in operations] == [
-        "Update",
-        "Update",
-        "Put",
-        "Put",
-        "Put",
-        "Put",
-    ]
-    assert operations[0]["Update"]["ConditionExpression"].find("#balance >= :amount") >= 0
-    assert operations[-1]["Put"]["Item"]["PK"]["S"] == "IDEMPOTENCY#transfer-001"
+    body = response.json()
+    assert body["external_reference"].startswith("MOCK-DBS-")
+    assert bank.balance(account_id) == Decimal("500.00")
+    assert total_ledger_balance(bank) == Decimal("0")
+    outbox = bank.items("OUTBOX#")
+    assert outbox[0]["payload"]["event_type"] == "DEPOSIT_COMPLETED"
+    assert outbox[0]["payload"]["recipients"][0]["customer_sub"] == "user-a"
+
+    replay = client.post(
+        f"/accounts/{account_id}/deposits",
+        headers={"Idempotency-Key": idempotency_key},
+        json={"amount": "500.00", "bank_code": "DBS", "external_account": "123456789"},
+    )
+    assert replay.status_code == 201
+    assert replay.headers["Idempotent-Replayed"] == "true"
+    assert replay.json() == body
+    assert bank.balance(account_id) == Decimal("500.00")
+
+    mismatch = client.post(
+        f"/accounts/{account_id}/deposits",
+        headers={"Idempotency-Key": idempotency_key},
+        json={"amount": "600.00", "bank_code": "DBS", "external_account": "123456789"},
+    )
+    assert mismatch.status_code == 409
 
 
-def test_transfer_requires_idempotency_key():
+def test_deposit_declined_by_partner_bank_writes_nothing(bank):
+    account_id = bank.add_account("user-a")
+
+    response = client.post(
+        f"/accounts/{account_id}/deposits",
+        headers={"Idempotency-Key": key()},
+        json={"amount": "50.00", "bank_code": "OCBC", "external_account": "111110000"},
+    )
+
+    assert response.status_code == 422
+    assert "closed" in response.json()["detail"]
+    assert bank.balance(account_id) == Decimal("0")
+    assert bank.items("OUTBOX#") == []
+
+
+def test_transfer_commits_both_legs_outbox_and_idempotency_atomically(bank):
+    sender = bank.add_account("user-a", "300.00")
+    receiver = bank.add_account("user-b")
+    idempotency_key = key()
+
+    response = transfer(sender, receiver, "120.50", idempotency_key)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["fraud_model"] == "rules-fallback"
+    assert bank.balance(sender) == Decimal("179.50")
+    assert bank.balance(receiver) == Decimal("120.50")
+    legs = [item for item in bank.items("ACCOUNT#") if item["SK"].startswith("TXN#")]
+    assert sorted(leg["entry_type"] for leg in legs) == ["CREDIT", "DEBIT"]
+    assert {leg["transaction_id"] for leg in legs} == {body["transaction_id"]}
+    event = bank.items("OUTBOX#")[0]["payload"]
+    assert [recipient["customer_sub"] for recipient in event["recipients"]] == ["user-a", "user-b"]
+    record = bank.items("IDEMPOTENCY#user-a#")[0]
+    assert record["transaction_id"] == body["transaction_id"]
+
+    replay = transfer(sender, receiver, "120.50", idempotency_key)
+    assert replay.status_code == 201
+    assert replay.json()["transaction_id"] == body["transaction_id"]
+    assert bank.balance(sender) == Decimal("179.50")
+
+
+def test_transfer_rejects_insufficient_funds_without_partial_writes(bank):
+    sender = bank.add_account("user-a", "40.00")
+    receiver = bank.add_account("user-b")
+
+    response = transfer(sender, receiver, "40.01")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Insufficient funds"
+    assert bank.balance(sender) == Decimal("40.00")
+    assert bank.balance(receiver) == Decimal("0")
+    assert bank.items("OUTBOX#") == []
+
+
+def test_transfer_cannot_spend_from_someone_elses_account(bank):
+    victim = bank.add_account("user-b", "900.00")
+    attacker = bank.add_account("user-a")
+
+    response = transfer(victim, attacker, "10.00")
+
+    assert response.status_code == 404
+    assert bank.balance(victim) == Decimal("900.00")
+
+
+def test_transfer_to_unknown_account_is_rejected(bank):
+    sender = bank.add_account("user-a", "100.00")
+
+    response = transfer(sender, str(uuid.uuid4()), "10.00")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Recipient account was not found"
+
+
+def test_transfer_requires_verified_identity(bank):
+    bank.add_customer("user-a", kyc_status="PENDING")
+    sender = bank.add_account("user-a", "100.00")
+    receiver = bank.add_account("user-b")
+
+    response = transfer(sender, receiver, "10.00")
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "kyc_required"
+
+
+def test_transfer_requires_idempotency_key(bank):
     response = client.post(
         "/transfers",
-        json={
-            "sender_account_id": "sender",
-            "receiver_account_id": "receiver",
-            "amount": "10.00",
-        },
+        json={"sender_account_id": str(uuid.uuid4()), "receiver_account_id": str(uuid.uuid4()), "amount": "1.00"},
     )
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Idempotency-Key header is required"
 
 
-def test_account_creation_links_customer_and_stores_starting_balance(monkeypatch):
-    cursor = FakeCursor()
-    connection = FakeConnection(cursor)
+def test_fraud_screening_blocks_before_any_write(bank):
+    sender = bank.add_account("user-a", "50000.00")
+    receiver = bank.add_account("user-b")
 
-    class FakeTable:
-        def put_item(self, **kwargs):
-            self.kwargs = kwargs
+    response = transfer(sender, receiver, "15000.00")
 
-    table = FakeTable()
-    monkeypatch.setattr(main, "connect_database", lambda: connection)
-    monkeypatch.setattr(main, "ensure_database_schema", lambda connection: None)
-    monkeypatch.setattr(main, "dynamodb_table", lambda: table)
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "fraud_blocked"
+    assert bank.balance(sender) == Decimal("50000.00")
+    assert bank.items("OUTBOX#") == []
+
+
+def test_high_value_transfer_requires_recent_sign_in(bank):
+    sender = bank.add_account("user-a", "5000.00")
+    receiver = bank.add_account("user-b")
+    bank.as_user("user-a", auth_age_seconds=3600)
+    idempotency_key = key()
+
+    challenged = transfer(sender, receiver, "1500.00", idempotency_key)
+
+    assert challenged.status_code == 401
+    assert challenged.json()["detail"]["code"] == "step_up_required"
+    assert "insufficient_user_authentication" in challenged.headers["WWW-Authenticate"]
+    assert bank.balance(sender) == Decimal("5000.00")
+
+    bank.as_user("user-a", auth_age_seconds=5)
+    retried = transfer(sender, receiver, "1500.00", idempotency_key)
+    assert retried.status_code == 201
+    assert bank.balance(receiver) == Decimal("1500.00")
+
+
+def test_sagemaker_score_is_used_when_endpoint_answers(bank, monkeypatch):
+    sender = bank.add_account("user-a", "200.00")
+    receiver = bank.add_account("user-b")
+    monkeypatch.setattr(config, "settings", config.Settings(**{**config.settings.__dict__, "fraud_endpoint_name": "fraud"}))
+    monkeypatch.setattr(fraud, "model_score", lambda features: 0.12)
+
+    response = transfer(sender, receiver, "20.00")
+
+    assert response.status_code == 201
+    assert response.json()["fraud_model"] == "sagemaker:fraud"
+    assert response.json()["fraud_score"] == 0.12
+
+
+def test_withdrawal_completes_and_settles_through_clearing(bank):
+    account_id = bank.add_account("user-a", "800.00")
 
     response = client.post(
-        "/accounts",
-        json={"full_name": "Ari Chen", "email": "ARI@example.com"},
+        f"/accounts/{account_id}/withdrawals",
+        headers={"Idempotency-Key": key()},
+        json={"amount": "300.00", "bank_code": "UOB", "external_account": "987654321"},
     )
 
     assert response.status_code == 201
-    assert [query.split(" ", 2)[2].split(" ", 1)[0] for query, _ in cursor.statements] == [
-        "customers",
-        "accounts",
+    assert response.json()["status"] == "COMPLETED"
+    assert bank.balance(account_id) == Decimal("500.00")
+    debit = next(item for item in bank.items(f"ACCOUNT#{account_id}") if item["SK"].startswith("TXN#"))
+    assert debit["status"] == "COMPLETED"
+    assert debit["external_reference"] == response.json()["external_reference"]
+    assert bank.items("OUTBOX#")[0]["payload"]["event_type"] == "WITHDRAWAL_COMPLETED"
+
+
+def test_declined_withdrawal_is_reversed_and_replayed(bank):
+    account_id = bank.add_account("user-a", "30000.00")
+    bank.as_user("user-a", auth_age_seconds=5)
+    idempotency_key = key()
+    payload = {"amount": "25000.00", "bank_code": "DBS", "external_account": "123456789"}
+
+    response = client.post(
+        f"/accounts/{account_id}/withdrawals", headers={"Idempotency-Key": idempotency_key}, json=payload
+    )
+
+    assert response.status_code == 422
+    assert response.json()["status"] == "REVERSED"
+    assert bank.balance(account_id) == Decimal("30000.00")
+    entries = [item for item in bank.items(f"ACCOUNT#{account_id}") if item["SK"].startswith("TXN#")]
+    assert sorted((entry["transaction_type"], entry["status"]) for entry in entries) == [
+        ("REVERSAL", "COMPLETED"),
+        ("WITHDRAWAL", "REVERSED"),
     ]
-    assert table.kwargs["Item"]["balance"] == Decimal("1000.00")
-    assert table.kwargs["ConditionExpression"] == "attribute_not_exists(PK) AND attribute_not_exists(SK)"
-    assert response.json()["kyc_status"] == "PENDING"
+    assert bank.items("OUTBOX#")[0]["payload"]["event_type"] == "WITHDRAWAL_REVERSED"
+    assert total_ledger_balance(bank) == Decimal("30000.00")
 
-
-def test_duplicate_idempotency_key_is_rejected_without_partial_writes(monkeypatch):
-    error = ClientError(
-        {
-            "Error": {"Code": "TransactionCanceledException", "Message": "Canceled"},
-            "CancellationReasons": [{"Code": "ConditionalCheckFailed"}],
-        },
-        "TransactWriteItems",
+    replay = client.post(
+        f"/accounts/{account_id}/withdrawals", headers={"Idempotency-Key": idempotency_key}, json=payload
     )
-    fake_client = FakeDynamoClient(
-        transact_error=error,
-        items={"IDEMPOTENCY#already-used": {"PK": {"S": "IDEMPOTENCY#already-used"}}},
-    )
-    configure_dynamo(monkeypatch, fake_client)
+    assert replay.status_code == 422
+    assert replay.headers["Idempotent-Replayed"] == "true"
 
-    response = client.post(
-        "/transfers",
-        headers={"Idempotency-Key": "already-used"},
-        json={
-            "sender_account_id": "sender",
-            "receiver_account_id": "receiver",
-            "amount": "10.00",
-        },
+
+def test_ledger_stays_zero_sum_across_a_customer_journey(bank):
+    first = bank.add_account("user-a")
+    second = bank.add_account("user-b")
+    client.post(
+        f"/accounts/{first}/deposits",
+        headers={"Idempotency-Key": key()},
+        json={"amount": "900.00", "bank_code": "DBS", "external_account": "123456789"},
+    )
+    transfer(first, second, "250.00")
+    bank.as_user("user-b")
+    client.post(
+        f"/accounts/{second}/withdrawals",
+        headers={"Idempotency-Key": key()},
+        json={"amount": "100.00", "bank_code": "OCBC", "external_account": "123456789"},
     )
 
-    assert response.status_code == 409
-    assert response.json()["detail"] == "Idempotency-Key has already been used"
-    assert len(fake_client.transact_calls) == 1
-    assert len(fake_client.get_calls) == 1
-    assert fake_client.get_calls[0]["ConsistentRead"] is True
+    assert bank.balance(first) == Decimal("650.00")
+    assert bank.balance(second) == Decimal("150.00")
+    assert total_ledger_balance(bank) == Decimal("0")
 
 
-def test_insufficient_funds_is_rejected_after_transaction_cancellation(monkeypatch):
-    error = ClientError(
-        {
-            "Error": {"Code": "TransactionCanceledException", "Message": "Canceled"},
-            "CancellationReasons": [{"Code": "ConditionalCheckFailed"}],
-        },
-        "TransactWriteItems",
-    )
-    fake_client = FakeDynamoClient(
-        transact_error=error,
-        items={"ACCOUNT#sender": {"balance": {"N": "4.00"}}},
-    )
-    configure_dynamo(monkeypatch, fake_client)
-
-    response = client.post(
-        "/transfers",
-        headers={"Idempotency-Key": "not-enough"},
-        json={
-            "sender_account_id": "sender",
-            "receiver_account_id": "receiver",
-            "amount": "10.00",
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Insufficient funds"
-    assert len(fake_client.transact_calls) == 1
-
-
-def test_mock_fraud_screen_blocks_high_value_transfer(monkeypatch):
-    fake_client = FakeDynamoClient()
-    configure_dynamo(monkeypatch, fake_client)
-
-    response = client.post(
-        "/transfers",
-        headers={"Idempotency-Key": "high-risk"},
-        json={
-            "sender_account_id": "sender",
-            "receiver_account_id": "receiver",
-            "amount": "10000.00",
-        },
-    )
-
-    assert response.status_code == 403
-    assert fake_client.transact_calls == []
-
-
-def test_balance_read_uses_strong_consistency(monkeypatch):
-    class FakeTable:
-        def get_item(self, **kwargs):
-            self.kwargs = kwargs
-            return {"Item": {"balance": Decimal("25.50"), "currency": "USD"}}
-
-    table = FakeTable()
-    monkeypatch.setattr(main, "dynamodb_table", lambda: table)
-
-    response = client.get("/accounts/account-1/balance")
-
-    assert response.status_code == 200
-    assert response.json()["balance"] == "25.50"
-    assert table.kwargs["ConsistentRead"] is True
-
-
-def test_database_endpoint_accepts_terraform_output_with_port():
-    assert main.parse_database_endpoint(
-        "facaibank.example.ap-southeast-1.rds.amazonaws.com:5432",
-        5432,
-    ) == ("facaibank.example.ap-southeast-1.rds.amazonaws.com", 5432)
-
-
-def test_transaction_history_read_is_eventually_consistent(monkeypatch):
-    class FakeTable:
-        def query(self, **kwargs):
-            self.kwargs = kwargs
-            return {"Items": [{"amount": Decimal("9.50"), "entry_type": "DEBIT"}]}
-
-    table = FakeTable()
-    monkeypatch.setattr(main, "dynamodb_table", lambda: table)
-
-    response = client.get("/accounts/account-1/transactions")
-
-    assert response.status_code == 200
-    assert response.json()["transactions"][0]["amount"] == "9.50"
-    assert table.kwargs["ConsistentRead"] is False
-
-
-def test_kyc_upload_uses_explicit_kms_encryption_and_updates_status(monkeypatch):
-    cursor = FakeCursor(result={"account_id": "account-1"})
-    connection = FakeConnection(cursor)
-
-    class FakeS3:
-        def put_object(self, **kwargs):
-            self.kwargs = kwargs
-
-    fake_s3 = FakeS3()
+def test_transaction_history_is_owner_only_and_eventually_consistent(bank, monkeypatch):
+    sender = bank.add_account("user-a", "100.00")
+    receiver = bank.add_account("user-b")
+    transfer(sender, receiver, "9.50")
+    calls = []
+    original_query = ledger.dynamodb_client().query
     monkeypatch.setattr(
-        main,
-        "settings",
-        main.Settings(kyc_statements_bucket="test-kyc-bucket"),
+        ledger.dynamodb_client(), "query", lambda **kwargs: calls.append(kwargs) or original_query(**kwargs)
     )
-    monkeypatch.setattr(main, "s3_client", lambda: fake_s3)
-    monkeypatch.setattr(main, "connect_database", lambda: connection)
-    monkeypatch.setattr(main, "ensure_database_schema", lambda connection: None)
 
-    response = client.post(
-        "/kyc/upload?account_id=account-1",
-        files={"file": ("identity.pdf", b"demo-document", "application/pdf")},
-    )
+    response = client.get(f"/accounts/{sender}/transactions")
 
     assert response.status_code == 200
-    assert fake_s3.kwargs["ServerSideEncryption"] == "aws:kms"
-    assert fake_s3.kwargs["Bucket"] == "test-kyc-bucket"
-    assert "UPDATE accounts SET kyc_status = 'VERIFIED_MOCK'" in cursor.statements[0][0]
-    assert response.json()["kyc_status"] == "VERIFIED_MOCK"
+    entry = response.json()["transactions"][0]
+    assert entry["amount"] == "9.50"
+    assert entry["entry_type"] == "DEBIT"
+    assert "fraud_score" not in entry
+    assert calls[0]["ConsistentRead"] is False
+    bank.as_user("user-b")
+    assert client.get(f"/accounts/{sender}/transactions").status_code == 404
 
 
-def test_statement_request_enqueues_job(monkeypatch):
-    class FakeSqs:
-        def send_message(self, **kwargs):
-            self.kwargs = kwargs
+def test_kyc_upload_checks_content_and_stores_encrypted_document(bank):
+    bank.add_customer("user-a", kyc_status="PENDING")
+    bank.database.results = [{"user_id": "customer-a"}]
 
-    fake_sqs = FakeSqs()
-    monkeypatch.setattr(
-        main,
-        "settings",
-        main.Settings(statement_queue_url="https://sqs.example/statement-jobs"),
-    )
-    monkeypatch.setattr(main, "sqs_client", lambda: fake_sqs)
+    rejected = client.post("/kyc/upload", files={"file": ("id.pdf", b"not a pdf", "application/pdf")})
+    accepted = client.post("/kyc/upload", files={"file": ("id.pdf", b"%PDF-1.7 demo", "application/pdf")})
 
-    response = client.post(
-        "/statements/request",
-        json={"account_id": "account-1"},
-    )
+    assert rejected.status_code == 415
+    assert accepted.status_code == 200
+    document_key = accepted.json()["document_key"]
+    head = boto3.client("s3", region_name=REGION).head_object(Bucket="test-kyc-statements", Key=document_key)
+    assert head["ServerSideEncryption"] == "aws:kms"
+    assert bank.database.statements[0][0].startswith("UPDATE customers SET kyc_status = 'VERIFIED_MOCK'")
+
+
+def test_statement_request_is_queued_tracked_and_downloadable(bank, monkeypatch):
+    account_id = bank.add_account("user-a")
+    queue_url = boto3.client("sqs", region_name=REGION).create_queue(QueueName="statement-jobs")["QueueUrl"]
+    monkeypatch.setattr(config, "settings", config.Settings(**{**config.settings.__dict__, "statement_queue_url": queue_url}))
+
+    response = client.post("/statements/request", json={"account_id": account_id, "start_date": "2026-10-01"})
 
     assert response.status_code == 202
-    assert response.json()["status"] == "QUEUED"
-    assert fake_sqs.kwargs["QueueUrl"].endswith("/statement-jobs")
-    assert response.json()["job_id"] in fake_sqs.kwargs["MessageBody"]
+    job_id = response.json()["job_id"]
+    message = boto3.client("sqs", region_name=REGION).receive_message(QueueUrl=queue_url)["Messages"][0]
+    assert json.loads(message["Body"])["owner_sub"] == "user-a"
+    queued = client.get(f"/accounts/{account_id}/statements/{job_id}").json()
+    assert queued["status"] == "QUEUED"
+    assert "download_url" not in queued
+
+    ledger.dynamodb_client().update_item(
+        TableName="test-ledger",
+        Key=ledger.to_av(ledger.statement_key(account_id, job_id)),
+        UpdateExpression="SET #s = :s, object_key = :k, completed_at = :c",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues=ledger.to_av(
+            {":s": "COMPLETED", ":k": f"statements/{account_id}/{job_id}.pdf", ":c": "2026-10-22T00:00:00+00:00"}
+        ),
+    )
+    completed = client.get(f"/accounts/{account_id}/statements/{job_id}").json()
+    assert completed["status"] == "COMPLETED"
+    assert "X-Amz-Signature" in completed["download_url"]
+    assert completed["download_url_expires_in"] == 900
+    assert client.get(f"/accounts/{account_id}/statements").json()["statements"][0]["job_id"] == job_id
+
+    bank.as_user("user-b")
+    assert client.get(f"/accounts/{account_id}/statements/{job_id}").status_code == 404
+
+
+def test_alert_subscription_filters_on_the_customers_identity(bank, monkeypatch):
+    bank.add_customer("user-a")
+    topic_arn = boto3.client("sns", region_name=REGION).create_topic(Name="customer-notifications")["TopicArn"]
+    monkeypatch.setattr(
+        config, "settings", config.Settings(**{**config.settings.__dict__, "notifications_topic_arn": topic_arn})
+    )
+
+    response = client.post("/me/alerts")
+
+    assert response.status_code == 202
+    subscription_arn = bank.database.statements[-1][1][0]
+    attributes = boto3.client("sns", region_name=REGION).get_subscription_attributes(
+        SubscriptionArn=subscription_arn
+    )["Attributes"]
+    assert json.loads(attributes["FilterPolicy"]) == {"customer_sub": ["user-a"]}
+    assert attributes["Endpoint"] == "user-a@example.com"
+
+
+def test_logout_revokes_the_access_token(bank):
+    from app.backend_api import cache
+
+    response = client.post("/auth/logout")
+
+    assert response.status_code == 204
+    assert cache.get_cache().exists(cache.revoked_key(bank.user.token_id))

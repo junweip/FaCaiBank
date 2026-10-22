@@ -1,0 +1,113 @@
+name: Deploy
+
+# Versioned deployment: push a tag (v1.4.0) or run manually with a ref.
+# Rollback: run this workflow with the previous tag as `ref`
+# (docs/runbooks/deploy-and-rollback.md).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git tag or commit to deploy (use the previous tag to roll back)
+        required: true
+        default: main
+      profile:
+        description: Variable file to apply
+        type: choice
+        options: [dev, full]
+        default: dev
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DEPLOY_REF: ${{ github.event.inputs.ref || github.ref_name }}
+      PROFILE: ${{ github.event.inputs.profile || 'dev' }}
+      AWS_REGION: ap-southeast-1
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      TF_VAR_security_alert_email: ${{ vars.SECURITY_ALERT_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Resolve release version
+        run: echo "APP_VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Package Lambda dependencies
+        run: python scripts/build_lambdas.py
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.4"
+          terraform_wrapper: false
+
+      - name: Terraform init (remote state)
+        working-directory: infra
+        run: |
+          cat > backend.hcl <<HCL
+          bucket         = "${{ vars.TF_STATE_BUCKET }}"
+          key            = "facaibank/dev/terraform.tfstate"
+          region         = "${AWS_REGION}"
+          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
+          encrypt        = true
+          HCL
+          terraform init -input=false -backend-config=backend.hcl
+
+      - name: Terraform plan
+        working-directory: infra
+        run: |
+          terraform plan -input=false -var-file="${PROFILE}.tfvars" -var "app_version=${APP_VERSION}" -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ env.APP_VERSION }}
+          path: infra/plan.txt
+
+      - name: Terraform apply
+        working-directory: infra
+        run: terraform apply -input=false tfplan
+
+      - name: Smoke test the released version
+        working-directory: infra
+        run: |
+          API="$(terraform output -raw api_base_url)"
+          for attempt in $(seq 1 60); do
+            VERSION="$(curl -fsS "${API}/health" | python -c 'import json,sys; print(json.load(sys.stdin)["version"])' || true)"
+            if [ "${VERSION}" = "${APP_VERSION}" ]; then
+              echo "Release ${APP_VERSION} is serving traffic at ${API}"
+              echo "### Deployed ${APP_VERSION} (${PROFILE})" >> "$GITHUB_STEP_SUMMARY"
+              echo "- API: ${API}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Waiting for instance refresh (${attempt}/60): serving '${VERSION}'"
+            sleep 20
+          done
+          echo "Release ${APP_VERSION} did not become healthy in 20 minutes" >&2
+          exit 1

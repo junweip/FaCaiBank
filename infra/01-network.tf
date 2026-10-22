@@ -189,10 +189,14 @@ resource "aws_vpc_endpoint" "interface" {
     "ec2messages",
     "kms",
     "logs",
+    "monitoring",
+    "sagemaker.runtime",
     "secretsmanager",
     "sns",
     "sqs",
     "ssm",
+    "ssmmessages",
+    "sts",
   ]) : toset([])
 
   vpc_id              = aws_vpc.main.id
@@ -204,5 +208,58 @@ resource "aws_vpc_endpoint" "interface" {
 
   tags = {
     Name = "facaibank-${var.env}-${each.key}"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "flow_logs" {
+  count = var.enable_vpc_flow_logs ? 1 : 0
+
+  name              = "/facaibank/${var.env}/vpc-flow-logs"
+  retention_in_days = 30
+  kms_key_id        = aws_kms_key.main.arn
+}
+
+resource "aws_iam_role" "flow_logs" {
+  count = var.enable_vpc_flow_logs ? 1 : 0
+
+  name = "facaibank-${var.env}-vpc-flow-logs"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+      Condition = { StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id } }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "flow_logs" {
+  count = var.enable_vpc_flow_logs ? 1 : 0
+
+  name = "write-flow-logs"
+  role = aws_iam_role.flow_logs[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+      Resource = "${aws_cloudwatch_log_group.flow_logs[0].arn}:*"
+    }]
+  })
+}
+
+resource "aws_flow_log" "vpc" {
+  count = var.enable_vpc_flow_logs ? 1 : 0
+
+  vpc_id                   = aws_vpc.main.id
+  traffic_type             = "ALL"
+  log_destination_type     = "cloud-watch-logs"
+  log_destination          = aws_cloudwatch_log_group.flow_logs[0].arn
+  iam_role_arn             = aws_iam_role.flow_logs[0].arn
+  max_aggregation_interval = 600
+
+  tags = {
+    Name = "facaibank-${var.env}-vpc-flow-logs"
   }
 }
