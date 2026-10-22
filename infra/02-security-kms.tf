@@ -1,3 +1,7 @@
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
 data "aws_iam_policy_document" "cmk" {
   statement {
     sid       = "EnableAccountAdministration"
@@ -6,7 +10,7 @@ data "aws_iam_policy_document" "cmk" {
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
     }
   }
 
@@ -57,7 +61,7 @@ data "aws_iam_policy_document" "cmk" {
       condition {
         test     = "StringEquals"
         variable = "kms:CallerAccount"
-        values   = [data.aws_caller_identity.current.account_id]
+        values   = [local.account_id]
       }
 
       condition {
@@ -69,11 +73,8 @@ data "aws_iam_policy_document" "cmk" {
   }
 
   statement {
-    sid = "AllowCloudTrailLogEncryption"
-    actions = [
-      "kms:DescribeKey",
-      "kms:GenerateDataKey*",
-    ]
+    sid       = "AllowCloudTrailLogEncryption"
+    actions   = ["kms:GenerateDataKey*"]
     resources = ["*"]
 
     principals {
@@ -82,9 +83,83 @@ data "aws_iam_policy_document" "cmk" {
     }
 
     condition {
+      test     = "StringLike"
+      variable = "kms:EncryptionContext:aws:cloudtrail:arn"
+      values   = ["arn:aws:cloudtrail:*:${local.account_id}:trail/*"]
+    }
+  }
+
+  statement {
+    sid       = "AllowCloudTrailDescribeKey"
+    actions   = ["kms:DescribeKey"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid = "AllowCloudWatchLogsEncryption"
+    actions = [
+      "kms:Encrypt*",
+      "kms:Decrypt*",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:Describe*",
+    ]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.aws_region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = ["arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:*"]
+    }
+  }
+
+  statement {
+    sid       = "AllowCloudFrontToReadStaticAssets"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:cloudfront::${local.account_id}:distribution/*"]
+    }
+  }
+
+  statement {
+    sid       = "AllowMacieToScanEncryptedObjects"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:PrincipalArn"
+      values   = ["arn:aws:iam::${local.account_id}:role/aws-service-role/macie.amazonaws.com/AWSServiceRoleForAmazonMacie"]
+    }
+
+    condition {
       test     = "StringEquals"
       variable = "kms:CallerAccount"
-      values   = [data.aws_caller_identity.current.account_id]
+      values   = [local.account_id]
     }
   }
 
@@ -95,7 +170,7 @@ data "aws_iam_policy_document" "cmk" {
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = ["arn:aws:iam::${local.account_id}:root"]
     }
 
     condition {
@@ -122,6 +197,8 @@ resource "aws_kms_alias" "main" {
   target_key_id = aws_kms_key.main.key_id
 }
 
+# Name and description are kept from the first release: changing either forces
+# replacement of a security group that is attached to running resources.
 resource "aws_security_group" "backend_app" {
   name        = "facaibank-${var.env}-backend-app"
   description = "Security group for future backend application workloads."
@@ -145,14 +222,6 @@ resource "aws_security_group" "rds" {
   description = "Restrict PostgreSQL access to backend application workloads."
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description     = "PostgreSQL from backend application workloads"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.backend_app.id]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -164,4 +233,22 @@ resource "aws_security_group" "rds" {
     Name = "facaibank-${var.env}-rds"
     Tier = "data"
   }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rds_from_backend" {
+  security_group_id            = aws_security_group.rds.id
+  referenced_security_group_id = aws_security_group.backend_app.id
+  description                  = "PostgreSQL from the API fleet."
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rds_from_statement_workers" {
+  security_group_id            = aws_security_group.rds.id
+  referenced_security_group_id = aws_security_group.statement_workers.id
+  description                  = "PostgreSQL (read replica) from statement workers."
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
 }

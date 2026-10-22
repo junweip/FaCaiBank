@@ -1,0 +1,91 @@
+#!/bin/bash
+# Bootstraps one FaCaiBank Python service (API or worker) from a versioned bundle.
+set -euo pipefail
+exec > >(tee /var/log/facaibank-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+dnf install -y python3.12 python3.12-pip unzip amazon-cloudwatch-agent logrotate
+ROOT=/opt/facaibank/${service}
+mkdir -p "$ROOT/${package_dir}" /var/log/facaibank
+aws s3 cp "s3://${bucket_name}/${bundle_key}" /tmp/bundle.zip --region "${aws_region}"
+unzip -q -o /tmp/bundle.zip -d "$ROOT/${package_dir}"
+python3.12 -m venv "$ROOT/venv"
+"$ROOT/venv/bin/pip" install --no-cache-dir -r "$ROOT/${requirements}"
+
+id facaibank >/dev/null 2>&1 || useradd --system --no-create-home --shell /sbin/nologin facaibank
+chown -R facaibank:facaibank "$ROOT" /var/log/facaibank
+
+cat > /etc/facaibank-${service}.env <<'ENV'
+%{ for key, value in environment ~}
+${key}=${value}
+%{ endfor ~}
+ENV
+chown root:facaibank /etc/facaibank-${service}.env
+chmod 640 /etc/facaibank-${service}.env
+
+cat > /etc/systemd/system/facaibank-${service}.service <<'UNIT'
+[Unit]
+Description=FaCaiBank ${service}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=facaibank
+Group=facaibank
+WorkingDirectory=/opt/facaibank/${service}
+EnvironmentFile=/etc/facaibank-${service}.env
+ExecStart=/opt/facaibank/${service}/${exec_start}
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=append:/var/log/facaibank/${service}.log
+StandardError=append:/var/log/facaibank/${service}.log
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+cat > /etc/logrotate.d/facaibank <<'ROTATE'
+/var/log/facaibank/*.log {
+    daily
+    rotate 3
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+ROTATE
+
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWAGENT'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {"file_path": "/var/log/facaibank/${service}.log", "log_group_name": "${log_group}", "log_stream_name": "{instance_id}"},
+          {"file_path": "/var/log/facaibank-bootstrap.log", "log_group_name": "${log_group}", "log_stream_name": "{instance_id}-bootstrap"}
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "FaCaiBank/Hosts",
+    "append_dimensions": {"AutoScalingGroupName": "$${aws:AutoScalingGroupName}"},
+    "aggregation_dimensions": [["AutoScalingGroupName"]],
+    "metrics_collected": {
+      "mem": {"measurement": ["mem_used_percent"]},
+      "disk": {"measurement": ["used_percent"], "resources": ["/"]}
+    }
+  }
+}
+CWAGENT
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+systemctl daemon-reload
+systemctl enable --now facaibank-${service}.service

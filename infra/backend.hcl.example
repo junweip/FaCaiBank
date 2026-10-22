@@ -1,0 +1,6 @@
+# Copy to backend.hcl (git-ignored) and fill in the values printed by infra/bootstrap.
+bucket         = "facaibank-tfstate-123456789012"
+key            = "facaibank/dev/terraform.tfstate"
+region         = "ap-southeast-1"
+dynamodb_table = "facaibank-terraform-locks"
+encrypt        = true

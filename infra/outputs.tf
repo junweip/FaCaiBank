@@ -1,3 +1,18 @@
+output "website_url" {
+  description = "Customer-facing HTTPS URL (CloudFront, or the custom domain when configured)."
+  value       = local.custom_domain ? "https://${var.domain_name}" : "https://${aws_cloudfront_distribution.main.domain_name}"
+}
+
+output "api_base_url" {
+  description = "Banking API base URL behind CloudFront and WAF."
+  value       = "${local.custom_domain ? "https://${var.domain_name}" : "https://${aws_cloudfront_distribution.main.domain_name}"}/api"
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (for cache invalidations)."
+  value       = aws_cloudfront_distribution.main.id
+}
+
 output "vpc_id" {
   description = "ID of the FaCaiBank VPC."
   value       = aws_vpc.main.id
@@ -24,8 +39,18 @@ output "kms_key_arn" {
 }
 
 output "rds_endpoint" {
-  description = "RDS PostgreSQL endpoint."
+  description = "RDS PostgreSQL primary endpoint."
   value       = aws_db_instance.main.endpoint
+}
+
+output "rds_identifier" {
+  description = "RDS primary instance identifier (for failover and restore tests)."
+  value       = aws_db_instance.main.identifier
+}
+
+output "rds_replica_endpoint" {
+  description = "RDS read replica endpoint, if enabled."
+  value       = var.enable_rds_read_replica ? aws_db_instance.replica[0].endpoint : null
 }
 
 output "rds_credentials_secret_arn" {
@@ -38,14 +63,24 @@ output "ledger_table_name" {
   value       = aws_dynamodb_table.ledger.name
 }
 
+output "outbox_lease_table_name" {
+  description = "DynamoDB table holding outbox shard leases and checkpoints."
+  value       = aws_dynamodb_table.outbox_leases.name
+}
+
 output "kyc_statements_bucket_name" {
   description = "Name of the KYC and statements S3 bucket."
   value       = aws_s3_bucket.kyc_statements.bucket
 }
 
 output "audit_bucket_name" {
-  description = "Name of the CloudTrail audit S3 bucket."
+  description = "Name of the CloudTrail/Config audit S3 bucket (Object Lock)."
   value       = aws_s3_bucket.audit.bucket
+}
+
+output "artifacts_bucket_name" {
+  description = "Bucket holding versioned deployment bundles and model artifacts."
+  value       = aws_s3_bucket.artifacts.bucket
 }
 
 output "events_queue_url" {
@@ -78,8 +113,13 @@ output "notifications_topic_arn" {
   value       = aws_sns_topic.notifications.arn
 }
 
+output "notifier_log_group" {
+  description = "CloudWatch log group of the notification Lambda."
+  value       = aws_cloudwatch_log_group.notifier.name
+}
+
 output "public_alb_dns_name" {
-  description = "Public URL hostname for the FaCaiBank frontend."
+  description = "Public ALB hostname. It only answers CloudFront (secret header + origin prefix list)."
   value       = aws_lb.public.dns_name
 }
 
@@ -98,27 +138,37 @@ output "cognito_user_pool_client_id" {
   value       = aws_cognito_user_pool_client.frontend.id
 }
 
-output "cognito_hosted_ui_domain" {
-  description = "Cognito hosted UI domain prefix."
-  value       = aws_cognito_user_pool_domain.main.domain
-}
-
-output "frontend_asg_name" {
-  description = "Frontend Auto Scaling Group name."
-  value       = aws_autoscaling_group.frontend.name
-}
-
-output "backend_asg_name" {
-  description = "Backend API Auto Scaling Group name."
-  value       = aws_autoscaling_group.backend.name
-}
-
-output "workers_asg_name" {
-  description = "Background workers Auto Scaling Group name."
-  value       = aws_autoscaling_group.workers.name
+output "asg_names" {
+  description = "Auto Scaling Group names per fleet."
+  value       = { for key, asg in aws_autoscaling_group.fleet : key => asg.name }
 }
 
 output "alerts_topic_arn" {
-  description = "SNS topic for CloudWatch and AWS Budget alerts."
+  description = "Page-level SNS topic (CloudWatch alarms, RDS events)."
   value       = aws_sns_topic.alerts.arn
+}
+
+output "ticket_topic_arn" {
+  description = "Ticket-level SNS topic (DLQs, replica lag, budget)."
+  value       = aws_sns_topic.alerts_ticket.arn
+}
+
+output "security_topic_arn" {
+  description = "Security SNS topic (root/IAM/KMS changes, GuardDuty, Security Hub, Macie)."
+  value       = aws_sns_topic.security_alerts.arn
+}
+
+output "dashboard_url" {
+  description = "CloudWatch operations dashboard."
+  value       = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.main.dashboard_name}"
+}
+
+output "fraud_endpoint_name" {
+  description = "SageMaker fraud endpoint, if enabled."
+  value       = var.enable_sagemaker_fraud ? aws_sagemaker_endpoint.fraud[0].name : null
+}
+
+output "athena_workgroup" {
+  description = "Athena workgroup for the analytics lake, if enabled."
+  value       = var.enable_analytics ? aws_athena_workgroup.analytics[0].name : null
 }
