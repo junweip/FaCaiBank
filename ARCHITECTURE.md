@@ -1,26 +1,48 @@
 # FaCaiBank Architecture & Implementation Rules (AWS ap-southeast-1)
 
 ## Core Architecture Rules (Strictly Enforced)
-1. **Region & Tagging**: All resources must be in `ap-southeast-1` (Singapore). Apply default tags (`Project = "FaCaiBank"`, `Environment = var.env`, `Owner = "Group3"`) to every resource.
+
+1. **Region & Tagging**: All resources are in `ap-southeast-1` (Singapore). The only exceptions are the CloudFront certificate and the CLOUDFRONT-scoped WAF web ACL, which AWS requires in `us-east-1`; they hold edge configuration, never customer data. Default tags on every resource: `Project`, `Environment`, `Owner = "Group3"`, `ManagedBy`, `AppVersion`.
+
 2. **Database Split**:
-   - **RDS PostgreSQL**: Stores ONLY `customers` and `accounts` metadata (user_id, account_id, kyc_status, created_at). NO balances or transaction ledgers in RDS.
-   - **DynamoDB (`facaibank-ledger`)**: Billing mode `PAY_PER_REQUEST`, encrypted with KMS CMK, `stream_enabled = true` (`NEW_IMAGE`). Stores:
-     - Account Balances (`PK = ACCOUNT#<id>`, `SK = BALANCE`)
-     - Ledger Entries (`PK = ACCOUNT#<id>`, `SK = TXN#<timestamp>#<txn_id>`)
-     - Outbox Events (`PK = OUTBOX#<txn_id>`, `SK = EVENT`)
-     - Deduplication Records (`PK = DEDUPE#<event_id>`, `SK = NOTIFICATION`)
-3. **Atomic Transfers (`TransactWriteItems`)**:
-   - Every transfer MUST execute a single DynamoDB `TransactWriteItems` call containing:
-     1. Decrement sender balance (with condition `balance >= amount` and `idempotency_key` check)
-     2. Increment receiver balance
-     3. Insert sender debit ledger item
-     4. Insert receiver credit ledger item
-     5. Insert outbox event item
+   - **RDS PostgreSQL**: customer and account metadata only (`customers`: Cognito subject, name, email, KYC status; `accounts`: type, nickname, currency). No balances or ledger entries. Schema changes are versioned SQL files in `app/backend_api/migrations`, applied once under a PostgreSQL advisory lock.
+   - **DynamoDB (`facaibank-ledger`)**: `PAY_PER_REQUEST`, KMS CMK, Streams (`NEW_IMAGE`), point-in-time recovery, TTL on `expires_at`. Items:
+     - Balances: `PK = ACCOUNT#<id>`, `SK = BALANCE` (carries `owner_sub`, the owner's Cognito subject)
+     - Ledger entries: `PK = ACCOUNT#<id>`, `SK = TXN#<timestamp>#<transaction_id>`
+     - Clearing accounts for partner-bank flows: `PK = ACCOUNT#CLEARING-<shard>` (sharded to avoid a hot key)
+     - Outbox events: `PK = OUTBOX#<transaction_id>`, `SK = EVENT` (expire after 7 days)
+     - Idempotency records: `PK = IDEMPOTENCY#<sub>#<key>`, `SK = TRANSFER|DEPOSIT|WITHDRAWAL` (store the original response)
+     - Dedupe records: `PK = DEDUPE#<event_id>`, `SK = NOTIFICATION#<role>`
+     - Statement jobs: `PK = ACCOUNT#<id>`, `SK = STATEMENT#<job_id>`
+   - **`facaibank-<env>-outbox-leases`**: shard leases, checkpoints and worker heartbeats for the outbox fleet.
+
+3. **Atomic Money Movement (`TransactWriteItems`)**:
+   - A transfer is one transaction: sender balance − amount (condition: exists, `owner_sub` = caller, `balance >= amount`), receiver balance + amount, debit leg, credit leg, outbox event, idempotency record.
+   - Deposits and withdrawals post the other leg to a clearing account, so the sum of all balances is always zero.
+   - A withdrawal debits into clearing first, then calls the partner bank; if the bank declines, a second transaction reverses it atomically.
+   - Repeating a request with the same `Idempotency-Key` returns the original response (`Idempotent-Replayed: true`); the same key with a different body returns 409.
+
 4. **Asynchronous Pipelines**:
-   - **Notifications**: DynamoDB Streams -> `outbox_worker.py` -> SQS `events-queue` (with `events-dlq`, `maxReceiveCount = 3`) -> AWS Lambda `lambda_notifier` (checks/writes `DEDUPE#<event_id>` in DynamoDB) -> SNS Topic `customer-notifications`.
-   - **Statements**: API / EventBridge Scheduler -> SQS `statement-jobs-queue` (with `statement-dlq`) -> `statement_worker.py` -> generates PDF statement -> uploads to S3 `kyc-statements-bucket` (SSE-KMS) -> returns presigned URL.
+   - **Notifications**: DynamoDB Streams → `outbox_worker.py` (leases + checkpoints, at-least-once) → SQS `events-queue` (`events-dlq`, `maxReceiveCount = 3`) → Lambda `lambda_notifier` (dedupe per event and recipient) → SNS `customer-notifications`, one alert per recipient tagged with `customer_sub`; each customer's email subscription filters on it.
+   - **Statements**: API or EventBridge Scheduler (monthly `MONTHLY_RUN`) → SQS `statement-jobs-queue` (`statement-dlq`) → `statement_worker.py` → PDF in S3 `kyc-statements` (SSE-KMS); the API issues a 15-minute presigned download.
+
 5. **Security & Networking**:
-   - VPC `10.0.0.0/16` across 3 AZs: Public subnets (`10.0.1.0/24`..`3.0/24`), Private App subnets (`10.0.11.0/24`..`13.0/24`), Private Data subnets (`10.0.21.0/24`..`23.0/24`).
-   - Security Group chaining: `Public ALB SG` -> `Frontend SG` -> `Internal ALB SG` -> `Backend App SG` -> `RDS SG`.
-   - S3 buckets must enforce `aws:kms` (SSE-KMS) with a Customer-Managed Key (CMK) and block all public access. Audit bucket must enable S3 Object Lock (`COMPLIANCE` / `GOVERNANCE` mode) and a 5-year (1825 days) Glacier Deep Archive retention rule.
-6. **Cost Control**: Parameterize `single_nat_gateway = true`, `rds_multi_az = false`, and `enable_interface_endpoints = false` in `dev.tfvars` to protect our $200 credit budget.
+   - Customers → CloudFront (HTTPS, WAF, security headers) → public ALB → frontend fleet → internal ALB → API fleet. The public ALB accepts only CloudFront's origin-facing prefix list and a secret `X-Origin-Verify` header.
+   - Every banking request carries a Cognito access token (MFA required). Transfers and withdrawals of SGD 1,000 or more, or those the fraud model flags, also need a sign-in in the last 5 minutes (step-up).
+   - VPC `10.0.0.0/16` across 3 AZs: public subnets (`10.0.1-3.0/24`, ALB and NAT only), private app subnets (`10.0.11-13.0/24`, all EC2 fleets), private data subnets (`10.0.21-23.0/24`, RDS and ElastiCache).
+   - Security group chain: CloudFront prefix list → public ALB → frontend → internal ALB → API → RDS/ElastiCache. Statement workers may also reach RDS; outbox workers have no inbound rules.
+   - All buckets: SSE-KMS (CMK), public access blocked, TLS-only policies. The audit bucket uses Object Lock (`GOVERNANCE` in dev, `COMPLIANCE` for production) with 5-year retention.
+   - No SSH: instances are reached through Session Manager. Services run as a non-root user.
+
+6. **Cost Control**: `dev.tfvars` keeps one NAT gateway, single-AZ RDS, no interface endpoints and one instance per fleet. `full.tfvars` turns on everything in the diagram for demos. See [docs/cost-review.md](docs/cost-review.md).
+
+## Deviations from the proposal diagram (slides 6 and 18)
+
+| Diagram | Implementation | Why |
+|---|---|---|
+| Frontend servers in public subnets | Frontend servers in private app subnets | Instances have no public IPs; only the ALB and NAT gateways sit in public subnets. Smaller attack surface, same request path. Update the slide or mention this in the report. |
+| WAF in front of CloudFront, plus the ALB | WAF attached to CloudFront only; the ALB is locked to CloudFront | One inspection point; requests that bypass CloudFront are refused |
+| Real-time fraud scoring (SageMaker) | SageMaker serverless endpoint with a rules fallback | A slow or failing endpoint must not block transfers or let them through unscored |
+| Shield | Shield Standard (automatic, free) | Shield Advanced costs USD 3,000/month |
+| Push notifications | Email (SNS) per customer | Push needs mobile app credentials (APNs/FCM); SMS needs SNS production access |
+| Adaptive auth, passkeys | Not implemented | Cognito Plus tier and WebAuthn were outside the agreed scope |

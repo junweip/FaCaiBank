@@ -1,6 +1,6 @@
 # Demo-day profile: every component on the architecture diagram. Expect roughly
-# USD 15-20 per day (docs/cost-review.md). Apply for the demo, then go back to
-# dev.tfvars or destroy.
+# USD 30 per day, a third of it interface endpoints (docs/cost-review.md). Apply
+# for the demo, then go back to dev.tfvars or destroy.
 env                       = "dev"
 aws_region                = "ap-southeast-1"
 vpc_cidr                  = "10.0.0.0/16"
