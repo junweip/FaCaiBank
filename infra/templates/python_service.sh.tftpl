@@ -33,6 +33,9 @@ Type=simple
 User=facaibank
 Group=facaibank
 WorkingDirectory=/opt/facaibank/${service}
+# ProtectHome hides /home, and libpq treats an unreadable ~/.postgresql as fatal,
+# so give the service user a home it can read.
+Environment=HOME=/opt/facaibank/${service}
 EnvironmentFile=/etc/facaibank-${service}.env
 ExecStart=/opt/facaibank/${service}/${exec_start}
 Restart=always
