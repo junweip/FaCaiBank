@@ -9,12 +9,14 @@ locals {
   static_bucket    = "facaibank-${var.env}-static-${local.account_id}-${var.aws_region}"
   cognito_endpoint = "https://cognito-idp.${var.aws_region}.amazonaws.com"
   content_types = {
-    css  = "text/css"
-    js   = "application/javascript"
-    png  = "image/png"
-    svg  = "image/svg+xml"
-    ico  = "image/x-icon"
-    json = "application/json"
+    css   = "text/css"
+    js    = "application/javascript"
+    png   = "image/png"
+    svg   = "image/svg+xml"
+    ico   = "image/x-icon"
+    json  = "application/json"
+    woff2 = "font/woff2"
+    txt   = "text/plain"
   }
   static_assets = [for file in fileset("${path.module}/../app/frontend/assets", "**") : file if file != "config.js"]
 }

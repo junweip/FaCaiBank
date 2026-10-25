@@ -71,11 +71,11 @@ jobs:
         working-directory: infra
         run: |
           cat > backend.hcl <<HCL
-          bucket         = "${{ vars.TF_STATE_BUCKET }}"
-          key            = "facaibank/dev/terraform.tfstate"
-          region         = "${AWS_REGION}"
-          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
-          encrypt        = true
+          bucket       = "${{ vars.TF_STATE_BUCKET }}"
+          key          = "facaibank/dev/terraform.tfstate"
+          region       = "${AWS_REGION}"
+          use_lockfile = true
+          encrypt      = true
           HCL
           terraform init -input=false -backend-config=backend.hcl
 

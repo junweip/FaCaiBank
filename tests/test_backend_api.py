@@ -45,6 +45,7 @@ def test_banking_endpoints_require_a_bearer_token():
 
 def test_open_account_creates_owned_zero_balance_and_metadata(bank):
     bank.add_customer("user-a")
+    bank.database.results = [{"user_id": "c"}, {"count": 0}, None]
 
     response = client.post("/accounts", json={"account_type": "SAVINGS", "nickname": " Rainy  day "})
 
@@ -57,6 +58,26 @@ def test_open_account_creates_owned_zero_balance_and_metadata(bank):
     statement, parameters = bank.database.statements[-1]
     assert statement.startswith("INSERT INTO accounts")
     assert parameters[3:5] == ("SAVINGS", "Rainy day")
+
+
+def test_account_limits_are_two_per_type(bank):
+    bank.add_customer("user-a")
+    bank.profiles["user-a"]["accounts"] = [
+        {"account_id": "a1", "account_type": "EVERYDAY"},
+        {"account_id": "a2", "account_type": "EVERYDAY"},
+        {"account_id": "a3", "account_type": "SAVINGS"},
+    ]
+
+    blocked = client.post("/accounts", json={"account_type": "EVERYDAY"})
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "You can hold up to 2 everyday accounts"
+
+    # A concurrent request that slipped past the cached profile is stopped by the locked count.
+    bank.database.results = [{"user_id": "c"}, {"count": 2}]
+    raced = client.post("/accounts", json={"account_type": "SAVINGS"})
+    assert raced.status_code == 409
+    assert bank.database.statements[0][0].endswith("FOR UPDATE")
+    assert bank.items("ACCOUNT#") == []
 
 
 def test_open_account_requires_a_profile(bank):
@@ -424,3 +445,16 @@ def test_logout_revokes_the_access_token(bank):
 
     assert response.status_code == 204
     assert cache.get_cache().exists(cache.revoked_key(bank.user.token_id))
+
+
+def test_closing_an_extra_account_sweeps_its_balance_and_keeps_the_ledger_balanced(bank):
+    keep = bank.add_account("user-a", "100.00")
+    extra = bank.add_account("user-a", "40.00")
+
+    swept = ledger.close_account_into(extra, keep, "user-a")
+
+    assert swept == Decimal("40.00")
+    assert bank.balance(keep) == Decimal("140.00")
+    assert bank.balance(extra) is None
+    closure_legs = [item for item in bank.items("ACCOUNT#") if item.get("transaction_type") == "ACCOUNT_CLOSURE"]
+    assert sorted(leg["entry_type"] for leg in closure_legs) == ["CREDIT", "DEBIT"]

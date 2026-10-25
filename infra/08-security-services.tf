@@ -189,6 +189,78 @@ resource "aws_macie2_classification_job" "kyc" {
 
 # ---------------------------------------------------------------- AWS Config
 
+# Config snapshots go to their own bucket: AWS Config cannot deliver to a bucket
+# with an Object Lock default retention, which the CloudTrail audit bucket has.
+resource "aws_s3_bucket" "config" {
+  count = var.enable_config ? 1 : 0
+
+  bucket        = "facaibank-${var.env}-config-${local.account_id}-${var.aws_region}"
+  force_destroy = true
+
+  tags = {
+    Name = "facaibank-${var.env}-config"
+    Tier = "audit"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "config" {
+  count = var.enable_config ? 1 : 0
+
+  bucket                  = aws_s3_bucket.config[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "config" {
+  count = var.enable_config ? 1 : 0
+
+  bucket = aws_s3_bucket.config[0].id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.main.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "config" {
+  count = var.enable_config ? 1 : 0
+
+  bucket = aws_s3_bucket.config[0].id
+
+  rule {
+    id     = "expire-config-history"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 365
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "config" {
+  count = var.enable_config ? 1 : 0
+
+  bucket = aws_s3_bucket.config[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [aws_s3_bucket.config[0].arn, "${aws_s3_bucket.config[0].arn}/*"]
+      Condition = { Bool = { "aws:SecureTransport" = "false" } }
+    }]
+  })
+}
+
 resource "aws_iam_role" "config" {
   count = var.enable_config ? 1 : 0
 
@@ -214,8 +286,8 @@ resource "aws_iam_role_policy" "config_delivery" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${aws_s3_bucket.audit.arn}/config/*" },
-      { Effect = "Allow", Action = ["s3:GetBucketAcl"], Resource = aws_s3_bucket.audit.arn },
+      { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${aws_s3_bucket.config[0].arn}/config/*" },
+      { Effect = "Allow", Action = ["s3:GetBucketAcl", "s3:ListBucket"], Resource = aws_s3_bucket.config[0].arn },
       { Effect = "Allow", Action = ["kms:GenerateDataKey", "kms:Decrypt"], Resource = aws_kms_key.main.arn },
     ]
   })
@@ -242,11 +314,11 @@ resource "aws_config_delivery_channel" "main" {
   count = var.enable_config ? 1 : 0
 
   name           = "facaibank-${var.env}"
-  s3_bucket_name = aws_s3_bucket.audit.id
+  s3_bucket_name = aws_s3_bucket.config[0].id
   s3_key_prefix  = "config"
   s3_kms_key_arn = aws_kms_key.main.arn
 
-  depends_on = [aws_config_configuration_recorder.main, aws_s3_bucket_policy.audit]
+  depends_on = [aws_config_configuration_recorder.main, aws_s3_bucket_policy.config, aws_iam_role_policy.config_delivery]
 }
 
 resource "aws_config_configuration_recorder_status" "main" {

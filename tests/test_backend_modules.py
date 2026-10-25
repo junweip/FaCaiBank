@@ -117,7 +117,29 @@ def test_redis_cache_fails_open():
     store.set("x", 1, 10)
 
 
-def test_migrations_apply_in_order_once_under_an_advisory_lock():
+def test_account_limit_plan_keeps_the_two_oldest_of_each_type():
+    from datetime import datetime, timedelta
+    from app.backend_api import account_limits
+
+    start = datetime(2026, 10, 1)
+    accounts = [
+        {"account_id": f"e{index}", "user_id": "u1", "account_type": "EVERYDAY", "created_at": start + timedelta(days=index), "cognito_sub": "s1"}
+        for index in range(4)
+    ] + [
+        {"account_id": "s0", "user_id": "u1", "account_type": "SAVINGS", "created_at": start, "cognito_sub": "s1"},
+        {"account_id": "x0", "user_id": "u2", "account_type": "EVERYDAY", "created_at": start, "cognito_sub": "s2"},
+    ]
+
+    plan = account_limits.plan_closures(accounts)
+
+    assert sorted(item["account_id"] for item in plan) == ["e2", "e3"]
+    assert {item["target_account_id"] for item in plan} == {"e0"}
+
+
+def test_migrations_apply_in_order_once_under_an_advisory_lock(monkeypatch):
+    data_migrations = []
+    monkeypatch.setattr(db, "DATA_MIGRATIONS", {"0003_data": lambda conn: data_migrations.append(conn)})
+
     class Cursor:
         def __init__(self):
             self.statements = []
@@ -151,7 +173,8 @@ def test_migrations_apply_in_order_once_under_an_advisory_lock():
 
     statements = [statement for statement, _ in connection.cursor_obj.statements]
     assert statements[0].startswith("SELECT pg_advisory_xact_lock")
-    assert applied == ["0002_customer_identity"]
+    assert applied == ["0002_customer_identity", "0003_data"]
+    assert len(data_migrations) == 1
     assert any("cognito_sub" in statement for statement in statements)
 
 

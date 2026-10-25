@@ -804,3 +804,43 @@ def list_statement_jobs(account_id: str, limit: int = 20) -> list[dict]:
     )
     jobs = [from_av(item) for item in response.get("Items", [])]
     return sorted(jobs, key=lambda job: job.get("requested_at", ""), reverse=True)
+
+
+# ---------------------------------------------------------------- account closure
+
+
+def close_account_into(source_account_id: str, target_account_id: str, subject: str) -> Decimal:
+    """Sweep a closing account's balance into another account of the same owner, then delete it.
+
+    Ledger entries of the closed account are kept for the audit trail.
+    """
+    source = get_balance_item(source_account_id, consistent=True)
+    if source is None:
+        return Decimal("0")
+    if source.get("owner_sub") != subject:
+        raise ValueError(f"Account {source_account_id} does not belong to {subject}")
+    amount = Decimal(str(source.get("balance", "0")))
+    if amount > 0:
+        transaction_id = str(uuid.uuid4())
+        timestamp = now_iso()
+        currency = source.get("currency", config.settings.currency)
+        common = {
+            "transaction_id": transaction_id,
+            "transaction_type": "ACCOUNT_CLOSURE",
+            "amount": amount,
+            "currency": currency,
+            "idempotency_key_value": f"closure-{source_account_id}",
+            "timestamp": timestamp,
+        }
+        sweep = _balance_update(source_account_id, "-", amount, timestamp, owner_subject=subject, require_funds=True)
+        sweep["Update"]["ConditionExpression"] += " AND #balance = :amount"
+        transact(
+            [
+                sweep,
+                _balance_update(target_account_id, "+", amount, timestamp, owner_subject=subject),
+                _put_new(ledger_entry(source_account_id, entry_type="DEBIT", counterparty=target_account_id, **common)),
+                _put_new(ledger_entry(target_account_id, entry_type="CREDIT", counterparty=source_account_id, **common)),
+            ]
+        )
+    delete_account_balance(source_account_id)
+    return amount

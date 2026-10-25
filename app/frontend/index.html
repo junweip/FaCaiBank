@@ -3,316 +3,310 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f4f6f2">
-    <title>FaCai Bank — Everyday, in balance</title>
+    <meta name="color-scheme" content="light dark">
+    <title>FaCai Bank</title>
+    <link rel="icon" type="image/png" href="assets/img/favicon.png">
+    <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+    <link rel="preload" href="assets/fonts/poppins-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/poppins-latin-600.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="assets/styles.css">
+    <script src="assets/theme.js"></script>
     <script src="assets/config.js"></script>
     <script src="assets/vendor/qrcode.js" defer></script>
     <script src="assets/app.js" defer></script>
   </head>
   <body class="signed-out">
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <!-- ============================================================ sign in -->
     <section class="auth-view" id="auth-view" aria-label="Sign in to FaCai Bank">
+      <button class="icon-button theme-toggle auth-theme" type="button" data-theme-toggle aria-label="Switch colour theme">
+        <span class="theme-icon" aria-hidden="true"></span>
+      </button>
       <div class="auth-card">
-        <div class="brand auth-brand">
-          <span class="brand-mark" aria-hidden="true">F</span>
-          <span>facai<span class="brand-light">bank</span></span>
+        <div class="brand brand-center">
+          <img class="brand-coin" src="assets/img/facai-coin.png" alt="" width="44" height="44">
+          <span class="brand-name">facai<span class="brand-light">bank</span></span>
         </div>
-        <p class="eyebrow">YOUR FINANCIAL HOME</p>
         <h1 class="auth-title">Good things are in <span>balance.</span></h1>
+        <p class="auth-subtitle">Everyday banking, fully online.</p>
 
-        <div class="auth-tabs" role="tablist">
-          <button type="button" class="auth-tab active" data-auth-tab="signin-form" role="tab">Sign in</button>
-          <button type="button" class="auth-tab" data-auth-tab="signup-form" role="tab">Create account</button>
+        <div class="segmented auth-tabs" role="tablist">
+          <button type="button" class="segment active" data-auth-tab="signin-form" role="tab">Sign in</button>
+          <button type="button" class="segment" data-auth-tab="signup-form" role="tab">Create account</button>
         </div>
 
-        <form id="signin-form" class="auth-panel">
+        <form id="signin-form" class="auth-panel" novalidate>
           <label class="field">Email address<input name="email" type="email" autocomplete="username" required></label>
           <label class="field">Password<input name="password" type="password" autocomplete="current-password" required></label>
-          <button class="button button-dark full-button" type="submit">Sign in <span>→</span></button>
+          <button class="button button-primary full" type="submit">Sign in</button>
         </form>
 
-        <form id="signup-form" class="auth-panel" hidden>
+        <form id="signup-form" class="auth-panel" novalidate hidden>
           <label class="field">Email address<input name="email" type="email" autocomplete="username" required></label>
           <label class="field">Password<input name="password" type="password" autocomplete="new-password" minlength="12" required></label>
-          <p class="form-hint">At least 12 characters with upper and lower case letters, a number and a symbol.</p>
-          <button class="button button-dark full-button" type="submit">Create my login <span>→</span></button>
+          <p class="hint">At least 12 characters with upper and lower case letters, a number and a symbol.</p>
+          <button class="button button-primary full" type="submit">Create my login</button>
         </form>
 
-        <form id="confirm-form" class="auth-panel" hidden>
-          <p class="modal-copy">We emailed a 6-digit code to <strong id="confirm-email"></strong>.</p>
+        <form id="confirm-form" class="auth-panel" novalidate hidden>
+          <p class="hint center">We emailed a 6-digit code to <strong id="confirm-email"></strong>.</p>
           <label class="field">Verification code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
-          <button class="button button-dark full-button" type="submit">Verify email <span>→</span></button>
+          <button class="button button-primary full" type="submit">Verify email</button>
           <button class="text-button" type="button" id="resend-code">Send a new code</button>
         </form>
 
-        <form id="mfa-setup-form" class="auth-panel" hidden>
-          <p class="modal-copy">Protect your money with an authenticator app. Scan this code, then enter the 6-digit code it shows.</p>
+        <form id="mfa-setup-form" class="auth-panel" novalidate hidden>
+          <p class="hint center">Scan this code with an authenticator app, then enter the 6-digit code it shows.</p>
           <div class="qr-box"><img id="mfa-qr" alt="Authenticator setup QR code"></div>
-          <p class="form-hint">Can't scan? Enter this key: <code id="mfa-secret"></code></p>
+          <p class="hint center">Can't scan? Enter this key: <code id="mfa-secret"></code></p>
           <label class="field">Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
-          <button class="button button-dark full-button" type="submit">Turn on MFA <span>→</span></button>
+          <button class="button button-primary full" type="submit">Turn on MFA</button>
         </form>
 
-        <form id="mfa-form" class="auth-panel" hidden>
-          <p class="modal-copy">Enter the 6-digit code from your authenticator app.</p>
+        <form id="mfa-form" class="auth-panel" novalidate hidden>
+          <p class="hint center">Enter the 6-digit code from your authenticator app.</p>
           <label class="field">Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
-          <button class="button button-dark full-button" type="submit">Continue <span>→</span></button>
+          <button class="button button-primary full" type="submit">Continue</button>
         </form>
-        <p class="auth-footer"><span class="secure-dot"></span> Multi-factor sign-in · Encrypted in Singapore</p>
+        <p class="auth-footer"><span class="dot"></span> Multi-factor sign-in · Encrypted in Singapore</p>
       </div>
     </section>
 
+    <!-- ============================================================ app -->
     <div class="app-shell" id="app-view" hidden>
       <aside class="sidebar" aria-label="Main navigation">
-        <a class="brand" href="#overview" aria-label="FaCai Bank home">
-          <span class="brand-mark" aria-hidden="true">F</span>
-          <span>facai<span class="brand-light">bank</span></span>
+        <a class="brand" href="#/overview" aria-label="FaCai Bank overview">
+          <img class="brand-coin" src="assets/img/facai-coin.png" alt="" width="36" height="36">
+          <span class="brand-name">facai<span class="brand-light">bank</span></span>
         </a>
-
-        <div class="workspace-label">YOUR SPACE</div>
         <nav class="navigation">
-          <a class="nav-link active" href="#overview"><span class="nav-icon">⌂</span>Overview</a>
-          <a class="nav-link" href="#transfer"><span class="nav-icon">↗</span>Transfers</a>
-          <a class="nav-link" href="#activity"><span class="nav-icon">◷</span>Activity</a>
-          <a class="nav-link" href="#documents"><span class="nav-icon">▧</span>Documents</a>
+          <a class="nav-link" href="#/overview" data-route="overview"><span class="nav-icon" aria-hidden="true">⌂</span><span class="nav-label">Overview</span></a>
+          <a class="nav-link" href="#/transfers" data-route="transfers"><span class="nav-icon" aria-hidden="true">⇄</span><span class="nav-label">Transfers</span></a>
+          <a class="nav-link" href="#/activity" data-route="activity"><span class="nav-icon" aria-hidden="true">◷</span><span class="nav-label">Activity</span></a>
+          <a class="nav-link" href="#/documents" data-route="documents"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label">Documents</span></a>
         </nav>
-
-        <div class="sidebar-bottom">
-          <div class="help-card">
-            <span class="help-icon">✳</span>
-            <strong>Here to help</strong>
-            <p>Your money questions, answered simply.</p>
-            <a href="mailto:support@facaibank.example">Get in touch <span aria-hidden="true">↗</span></a>
-          </div>
-          <div class="profile">
-            <div class="avatar" id="profile-initials">FC</div>
-            <div><strong id="profile-name">FaCai customer</strong><span id="profile-email">Personal banking</span></div>
-            <button class="profile-more" id="sign-out" type="button" aria-label="Sign out" title="Sign out">⏻</button>
-          </div>
+        <div class="profile">
+          <div class="avatar" id="profile-initials">FC</div>
+          <div class="profile-copy"><strong id="profile-name">FaCai customer</strong><span id="profile-email">Personal banking</span></div>
+          <button class="icon-button" id="sign-out" type="button" aria-label="Sign out" title="Sign out">⏻</button>
         </div>
       </aside>
 
-      <main class="main-content" id="overview">
+      <main class="main">
         <header class="topbar">
-          <div class="breadcrumb">Personal banking <span>/</span> <strong>Overview</strong></div>
+          <div>
+            <p class="eyebrow" id="today-label">TODAY</p>
+            <h1 class="page-title" id="page-title">Overview</h1>
+          </div>
           <div class="topbar-actions">
-            <span class="secure-label"><span class="secure-dot"></span> <span id="kyc-label">Identity check pending</span></span>
-            <button class="icon-button" type="button" data-open-modal="alerts-modal" aria-label="Transaction alerts">♧<span class="notification-dot" id="alerts-dot"></span></button>
+            <span class="status-chip" id="kyc-chip"><span class="dot"></span><span id="kyc-label">Identity check pending</span></span>
+            <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="Switch colour theme"><span class="theme-icon" aria-hidden="true"></span></button>
+            <button class="icon-button" type="button" data-open-modal="alerts-modal" aria-label="Transaction alerts">
+              <span aria-hidden="true">♧</span><span class="badge-dot" id="alerts-dot"></span>
+            </button>
           </div>
         </header>
 
-        <section class="welcome-row">
-          <div>
-            <p class="eyebrow" id="today-label">YOUR FINANCIAL HOME</p>
-            <h1>Good things are<br class="mobile-break"> in <span>balance.</span></h1>
-            <p class="welcome-copy" id="welcome-copy">A little more clarity for everything you’re building.</p>
-          </div>
-          <button class="button button-dark" type="button" data-open-modal="account-modal"><span>＋</span> Open an account</button>
+        <section class="notice" id="kyc-banner" hidden>
+          <span class="notice-icon" aria-hidden="true">✓</span>
+          <div class="notice-copy"><strong>Verify your identity to start moving money</strong><span>Upload a PDF, PNG or JPG of your ID. Verification is simulated in this prototype.</span></div>
+          <a class="button button-accent" href="#/documents">Verify now</a>
         </section>
 
-        <section class="notice-banner" id="kyc-banner" hidden>
-          <span class="notice-icon">✓</span>
-          <div><strong>Verify your identity to start moving money</strong><p>Upload a PDF, PNG or JPG of your ID. In this prototype the check is simulated.</p></div>
-          <button class="button button-green" type="button" data-open-modal="kyc-modal">Verify now <span>→</span></button>
-        </section>
+        <!-- ---------------------------------------------------- overview -->
+        <section class="page" data-page="overview">
+          <div class="account-switcher" id="account-switcher" role="tablist" aria-label="Your accounts"></div>
 
-        <section class="summary-grid" aria-label="Account summary">
-          <article class="balance-card">
-            <div class="card-topline">
-              <span class="card-label">AVAILABLE BALANCE</span>
-              <button class="more-button" id="copy-account" type="button" aria-label="Copy account number" title="Copy account number">⧉</button>
-            </div>
-            <p class="balance-amount" id="balance-amount">S$0.00</p>
-            <div class="account-picker">
-              <span class="account-icon">F</span>
-              <span id="account-summary">Open an account to get started</span>
-              <button id="refresh-balance" class="refresh-button" type="button" aria-label="Refresh balance">↻</button>
-            </div>
-            <div class="balance-decoration decoration-one"></div>
-            <div class="balance-decoration decoration-two"></div>
-          </article>
-
-          <article class="quick-card">
-            <div class="card-topline">
-              <span class="card-label">QUICK ACTIONS</span>
-              <span class="sparkle" aria-hidden="true">✳</span>
-            </div>
-            <div class="quick-actions">
-              <a class="quick-action" href="#transfer">
-                <span class="action-icon transfer-icon">↗</span><span>Send money</span>
-              </a>
-              <button class="quick-action" type="button" data-open-modal="money-modal" data-direction="deposit">
-                <span class="action-icon deposit-icon">↓</span><span>Add money</span>
-              </button>
-              <button class="quick-action" type="button" data-open-modal="money-modal" data-direction="withdraw">
-                <span class="action-icon withdraw-icon">↑</span><span>Withdraw</span>
-              </button>
-              <button class="quick-action" type="button" data-open-modal="statement-modal">
-                <span class="action-icon document-icon">▤</span><span>Get a statement</span>
-              </button>
-            </div>
-          </article>
-        </section>
-
-        <section class="content-grid">
-          <div class="primary-column">
-            <section class="panel transfer-panel" id="transfer">
-              <div class="section-heading">
-                <div><p class="eyebrow">MOVE WITH EASE</p><h2>Make a transfer</h2></div>
-                <span class="heading-icon">↗</span>
+          <div class="overview-grid">
+            <article class="balance-card">
+              <div class="card-row">
+                <span class="card-label">AVAILABLE BALANCE</span>
+                <button class="icon-button on-dark" id="refresh-balance" type="button" aria-label="Refresh balance">↻</button>
               </div>
-              <form id="transfer-form" class="form-grid">
-                <label class="field">From account
-                  <select name="sender_account_id" class="account-options" required>
-                    <option value="">Select your account</option>
-                  </select>
+              <p class="balance-amount" id="balance-amount">S$0.00</p>
+              <div class="card-row">
+                <span class="account-name" id="account-summary">Open an account to get started</span>
+                <button class="pill-button on-dark" id="copy-account" type="button">⧉ Copy account no.</button>
+              </div>
+              <span class="balance-ring ring-one"></span><span class="balance-ring ring-two"></span>
+            </article>
+
+            <article class="panel quick-panel">
+              <span class="card-label">QUICK ACTIONS</span>
+              <div class="quick-actions">
+                <a class="quick-action" href="#/transfers"><span class="action-icon tone-green">↗</span><span>Send money</span></a>
+                <button class="quick-action" type="button" data-open-modal="money-modal" data-direction="deposit"><span class="action-icon tone-teal">↓</span><span>Add money</span></button>
+                <button class="quick-action" type="button" data-open-modal="money-modal" data-direction="withdraw"><span class="action-icon tone-amber">↑</span><span>Withdraw</span></button>
+                <a class="quick-action" href="#/documents"><span class="action-icon tone-blue">▤</span><span>Statements</span></a>
+              </div>
+            </article>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Recent activity</h2>
+              <button class="text-button" id="refresh-recent" type="button">Refresh ↻</button>
+            </div>
+            <div class="activity-list" id="recent-activity"></div>
+            <a class="button button-outline full" href="#/activity">View all activity →</a>
+          </section>
+        </section>
+
+        <!-- ---------------------------------------------------- transfers -->
+        <section class="page" data-page="transfers" hidden>
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-head"><h2>Send a transfer</h2><span class="head-icon">⇄</span></div>
+              <form id="transfer-form" class="form-stack" novalidate>
+                <label class="field">From
+                  <select name="sender_account_id" class="account-options" required></select>
+                  <span class="hint" id="transfer-available">Available: S$0.00</span>
                 </label>
                 <label class="field">To
-                  <select name="receiver_choice" id="receiver-choice" class="account-options" data-include-other="true" required>
-                    <option value="">Select a recipient</option>
-                  </select>
+                  <select name="receiver_choice" id="receiver-choice" class="account-options" data-include-other="true" required></select>
                 </label>
-                <label class="field field-full" id="receiver-other" hidden>Recipient account number
-                  <input name="receiver_account_id" type="text" placeholder="e.g. 3f1c7d2e-…" autocomplete="off" spellcheck="false">
+                <label class="field" id="receiver-other" hidden>Recipient account number
+                  <input name="receiver_account_id" type="text" placeholder="e.g. 3f1c7d2e-1a2b-4c3d-8e9f-0a1b2c3d4e5f" autocomplete="off" spellcheck="false" pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}">
                 </label>
                 <label class="field">Amount
-                  <span class="input-with-prefix"><span>S$</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></span>
+                  <span class="money-input"><span>S$</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></span>
                 </label>
-                <button class="button button-green transfer-submit" type="submit">Send transfer <span>→</span></button>
+                <button class="button button-primary full" type="submit">Send transfer</button>
               </form>
-              <p class="form-hint"><span>♧</span> Every transfer is fraud-screened. Transfers of S$1,000 or more ask you to confirm it's you.</p>
+              <p class="hint center">Every transfer is fraud-screened. Transfers of S$1,000 or more ask you to confirm it's you.</p>
             </section>
 
-            <section class="panel activity-panel" id="activity">
-              <div class="section-heading activity-heading">
-                <div><p class="eyebrow">THE LITTLE DETAILS</p><h2>Recent activity</h2></div>
-                <button class="text-button" id="refresh-transactions" type="button">Refresh <span>↻</span></button>
+            <section class="panel">
+              <div class="panel-head"><h2>Partner banks</h2><span class="head-icon">🏦</span></div>
+              <p class="muted">Move money between FaCai Bank and your account at DBS, OCBC, UOB or Standard Chartered.</p>
+              <div class="button-row">
+                <button class="button button-accent" type="button" data-open-modal="money-modal" data-direction="deposit">↓ Add money</button>
+                <button class="button button-outline" type="button" data-open-modal="money-modal" data-direction="withdraw">↑ Withdraw</button>
               </div>
-              <div id="activity-list" class="activity-list">
-                <div class="empty-state"><span class="empty-icon">◷</span><strong>Your story starts here</strong><p>Open an account to see your transactions.</p></div>
-              </div>
+              <ul class="tips">
+                <li>Partner bank transfers are simulated in this prototype.</li>
+                <li>External accounts ending in 0000 are closed; amounts over S$20,000 are declined.</li>
+                <li>A declined withdrawal is reversed and your money returns immediately.</li>
+              </ul>
             </section>
           </div>
-
-          <aside class="secondary-column" id="services">
-            <section class="panel account-panel">
-              <div class="section-heading compact-heading">
-                <div><p class="eyebrow">AT A GLANCE</p><h2>Your accounts</h2></div>
-                <span class="heading-icon small">▤</span>
-              </div>
-              <div id="account-list" class="account-list">
-                <div class="account-empty">Your accounts will appear here.</div>
-              </div>
-              <button class="button button-outline full-button" type="button" data-open-modal="account-modal">＋ Add an account</button>
-            </section>
-
-            <section class="panel account-panel" id="documents">
-              <div class="section-heading compact-heading">
-                <div><p class="eyebrow">YOUR RECORDS</p><h2>Statements</h2></div>
-                <button class="text-button" id="refresh-statements" type="button">Refresh <span>↻</span></button>
-              </div>
-              <div id="statement-list" class="account-list">
-                <div class="account-empty">Statements you request will appear here.</div>
-              </div>
-              <button class="button button-outline full-button" type="button" data-open-modal="statement-modal">Request a statement</button>
-            </section>
-          </aside>
         </section>
-        <footer class="page-footer"><span>FaCai Bank</span><span>Small steps. Stronger futures.</span><span id="version-label">Prototype</span></footer>
+
+        <!-- ---------------------------------------------------- activity -->
+        <section class="page" data-page="activity" hidden>
+          <section class="panel">
+            <div class="panel-head">
+              <label class="field inline">Account <select class="account-options" id="activity-account"></select></label>
+              <button class="text-button" id="refresh-activity" type="button">Refresh ↻</button>
+            </div>
+            <div class="activity-list" id="activity-list"></div>
+          </section>
+        </section>
+
+        <!-- ---------------------------------------------------- documents -->
+        <section class="page" data-page="documents" hidden>
+          <div class="two-column">
+            <section class="panel">
+              <div class="panel-head"><h2>Statements</h2><button class="text-button" id="refresh-statements" type="button">Refresh ↻</button></div>
+              <form id="statement-form" class="form-stack" novalidate>
+                <label class="field">Account <select name="account_id" class="account-options" required></select></label>
+                <div class="form-row">
+                  <label class="field">From<input name="start_date" type="date"></label>
+                  <label class="field">To<input name="end_date" type="date"></label>
+                </div>
+                <button class="button button-primary full" type="submit">Request PDF statement</button>
+              </form>
+              <div class="item-list" id="statement-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head"><h2>Identity verification</h2><span class="status-chip" id="kyc-status-chip"><span class="dot"></span><span id="kyc-status">Pending</span></span></div>
+              <p class="muted">Your document is stored encrypted (SSE-KMS) in Singapore and is only used to verify who you are.</p>
+              <form id="kyc-form" class="form-stack" novalidate>
+                <label class="field upload">Identity document
+                  <input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required>
+                  <span class="hint">PDF, PNG or JPG · up to 10 MB</span>
+                </label>
+                <button class="button button-primary full" type="submit">Upload securely</button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <footer class="footer"><span>FaCai Bank</span><span id="version-label">Prototype</span></footer>
       </main>
     </div>
 
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
+    <!-- ============================================================ dialogs -->
     <dialog class="modal" id="profile-modal">
-      <form id="profile-form" class="modal-card">
-        <p class="eyebrow">WELCOME</p><h2>Tell us your name</h2>
-        <p class="modal-copy">We use your legal name on statements. Your email comes from your verified login.</p>
-        <label class="field">Full name<input name="full_name" autocomplete="name" required minlength="2" maxlength="120" placeholder="Your name"></label>
-        <button class="button button-green full-button" type="submit">Continue <span>→</span></button>
+      <form id="profile-form" class="modal-card" novalidate>
+        <img class="modal-coin" src="assets/img/facai-coin.png" alt="" width="56" height="56">
+        <h2 class="center">Welcome to FaCai Bank</h2>
+        <p class="muted center">We use your legal name on statements. Your email comes from your verified login.</p>
+        <label class="field">Full name<input name="full_name" autocomplete="name" required minlength="2" maxlength="120"></label>
+        <button class="button button-primary full" type="submit">Continue</button>
       </form>
     </dialog>
 
     <dialog class="modal" id="account-modal">
-      <form id="account-form" class="modal-card">
+      <form id="account-form" class="modal-card" novalidate>
         <button class="modal-close" type="button" aria-label="Close">×</button>
-        <p class="eyebrow">A FRESH START</p><h2>Open an account</h2>
-        <p class="modal-copy">Linked accounts share your login and identity check. New accounts start at S$0.00 — add money from a partner bank.</p>
+        <h2>Open an account</h2>
+        <p class="muted">You can hold up to 2 everyday and 2 savings accounts. New accounts start at S$0.00.</p>
         <label class="field">Account type
-          <select name="account_type"><option value="EVERYDAY">Everyday</option><option value="SAVINGS">Savings</option></select>
+          <select name="account_type" id="account-type-select" required>
+            <option value="EVERYDAY">Everyday</option>
+            <option value="SAVINGS">Savings</option>
+          </select>
+          <span class="hint" id="account-limit-hint"></span>
         </label>
         <label class="field">Nickname (optional)<input name="nickname" maxlength="60" placeholder="e.g. Rainy day"></label>
-        <button class="button button-green full-button" type="submit">Open account <span>→</span></button>
-      </form>
-    </dialog>
-
-    <dialog class="modal" id="kyc-modal">
-      <form id="kyc-form" class="modal-card">
-        <button class="modal-close" type="button" aria-label="Close">×</button>
-        <p class="eyebrow">A QUICK CHECK-IN</p><h2>Verify your identity</h2>
-        <p class="modal-copy">Your document is stored encrypted (SSE-KMS) in Singapore. Identity verification is simulated in this prototype.</p>
-        <label class="field upload-field">Choose a document<input name="file" type="file" accept="application/pdf,image/png,image/jpeg" required><span>PDF, PNG or JPG · Up to 10 MB</span></label>
-        <button class="button button-green full-button" type="submit">Upload securely <span>→</span></button>
+        <button class="button button-primary full" type="submit">Open account</button>
       </form>
     </dialog>
 
     <dialog class="modal" id="money-modal">
-      <form id="money-form" class="modal-card">
+      <form id="money-form" class="modal-card" novalidate>
         <button class="modal-close" type="button" aria-label="Close">×</button>
-        <p class="eyebrow">PARTNER BANK TRANSFER</p><h2 id="money-title">Add money</h2>
+        <h2 id="money-title">Add money</h2>
         <div class="segmented" role="radiogroup">
-          <label><input type="radio" name="direction" value="deposit" checked> Add money</label>
-          <label><input type="radio" name="direction" value="withdraw"> Withdraw</label>
+          <label class="segment"><input type="radio" name="direction" value="deposit" checked> Add money</label>
+          <label class="segment"><input type="radio" name="direction" value="withdraw"> Withdraw</label>
         </div>
         <label class="field">FaCai account
-          <select name="account_id" class="account-options" required><option value="">Select an account</option></select>
+          <select name="account_id" class="account-options" required></select>
+          <span class="hint" id="money-available">Available: S$0.00</span>
         </label>
-        <div class="form-grid">
+        <div class="form-row">
           <label class="field">Partner bank<select name="bank_code" id="bank-options" required></select></label>
-          <label class="field">Bank account number<input name="external_account" inputmode="numeric" pattern="[0-9]{9,12}" placeholder="9–12 digits" required></label>
+          <label class="field">Bank account no.<input name="external_account" inputmode="numeric" pattern="[0-9]{9,12}" placeholder="9–12 digits" required></label>
         </div>
         <label class="field">Amount
-          <span class="input-with-prefix"><span>S$</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></span>
+          <span class="money-input"><span>S$</span><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></span>
         </label>
-        <p class="form-hint">Simulated partner bank: accounts ending 0000 are closed and amounts over S$20,000 are declined.</p>
-        <button class="button button-green full-button" type="submit">Continue <span>→</span></button>
-      </form>
-    </dialog>
-
-    <dialog class="modal" id="statement-modal">
-      <form id="statement-form" class="modal-card">
-        <button class="modal-close" type="button" aria-label="Close">×</button>
-        <p class="eyebrow">YOUR RECORDS, READY WHEN YOU ARE</p><h2>Request a statement</h2>
-        <p class="modal-copy">We’ll build a PDF in the background. It appears under Statements when it’s ready.</p>
-        <label class="field">Account
-          <select name="account_id" class="account-options" required><option value="">Select an account</option></select>
-        </label>
-        <div class="form-grid">
-          <label class="field">From<input name="start_date" type="date"></label>
-          <label class="field">To<input name="end_date" type="date"></label>
-        </div>
-        <button class="button button-green full-button" type="submit">Request statement <span>→</span></button>
+        <button class="button button-primary full" type="submit" id="money-submit">Add money</button>
       </form>
     </dialog>
 
     <dialog class="modal" id="step-up-modal">
-      <form id="step-up-form" class="modal-card">
+      <form id="step-up-form" class="modal-card" novalidate>
         <button class="modal-close" type="button" aria-label="Close">×</button>
-        <p class="eyebrow">EXTRA SECURITY</p><h2>Confirm it’s you</h2>
-        <p class="modal-copy" id="step-up-reason">This transaction needs a fresh sign-in.</p>
+        <h2>Confirm it’s you</h2>
+        <p class="muted" id="step-up-reason">This transaction needs a fresh sign-in.</p>
         <label class="field">Password<input name="password" type="password" autocomplete="current-password" required></label>
         <label class="field">Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
-        <button class="button button-green full-button" type="submit">Confirm and continue <span>→</span></button>
+        <button class="button button-primary full" type="submit">Confirm and continue</button>
       </form>
     </dialog>
 
     <dialog class="modal" id="alerts-modal">
-      <form id="alerts-form" class="modal-card">
+      <form id="alerts-form" class="modal-card" novalidate>
         <button class="modal-close" type="button" aria-label="Close">×</button>
-        <p class="eyebrow">STAY IN THE KNOW</p><h2>Transaction alerts</h2>
-        <p class="modal-copy">Get an email for every transfer, deposit and withdrawal on your accounts.</p>
+        <h2>Transaction alerts</h2>
+        <p class="muted">Get an email for every transfer, deposit and withdrawal on your accounts.</p>
         <p class="status-line">Status: <strong id="alerts-status">Checking…</strong></p>
-        <button class="button button-green full-button" type="submit" id="alerts-submit">Email me alerts <span>→</span></button>
+        <button class="button button-primary full" type="submit" id="alerts-submit">Email me alerts</button>
       </form>
     </dialog>
   </body>

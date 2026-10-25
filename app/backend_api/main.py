@@ -22,6 +22,7 @@ from psycopg.errors import UniqueViolation
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 from . import auth, cache, config, db, external_bank, fraud, ledger, metrics
+from .account_limits import ACCOUNT_LIMITS
 from .auth import AuthenticatedUser, current_user
 
 
@@ -33,7 +34,6 @@ logging.basicConfig(
 
 PROFILE_TTL_SECONDS = 60
 OWNER_TTL_SECONDS = 3600
-MAX_ACCOUNTS_PER_CUSTOMER = 5
 MAX_AMOUNT = Decimal("200000.00")
 IDEMPOTENCY_KEY = re.compile(r"[A-Za-z0-9_.:\-]{8,128}")
 KYC_SIGNATURES = {
@@ -375,23 +375,36 @@ def list_accounts(user: AuthenticatedUser = Depends(current_user)):
 @app.post("/accounts", status_code=201, name="open_account")
 def open_account(request: AccountCreate, user: AuthenticatedUser = Depends(current_user)):
     profile = require_profile(user)
-    if len(profile["accounts"]) >= MAX_ACCOUNTS_PER_CUSTOMER:
-        raise HTTPException(status_code=409, detail="You can hold up to five accounts")
+    limit = ACCOUNT_LIMITS[request.account_type]
+    label = request.account_type.lower()
+    if sum(1 for account in profile["accounts"] if account["account_type"] == request.account_type) >= limit:
+        raise HTTPException(status_code=409, detail=f"You can hold up to {limit} {label} accounts")
     account_id = str(uuid.uuid4())
     currency = config.settings.currency
-    ledger.create_account_balance(account_id, user.subject, profile["customer_id"], request.account_type, currency)
+    balance_created = False
     try:
         with db.primary.connection() as conn, conn.cursor() as cursor:
+            # Lock the customer row so two simultaneous requests cannot both pass the limit check.
+            cursor.execute("SELECT user_id FROM customers WHERE user_id = %s FOR UPDATE", (profile["customer_id"],))
+            cursor.execute(
+                "SELECT COUNT(*) AS count FROM accounts WHERE user_id = %s AND account_type = %s",
+                (profile["customer_id"], request.account_type),
+            )
+            if cursor.fetchone()["count"] >= limit:
+                raise HTTPException(status_code=409, detail=f"You can hold up to {limit} {label} accounts")
             cursor.execute(
                 "INSERT INTO accounts (account_id, user_id, kyc_status, account_type, nickname, currency) "
                 "VALUES (%s, %s, %s, %s, %s, %s)",
                 (account_id, profile["customer_id"], profile["kyc_status"], request.account_type, request.nickname, currency),
             )
+            ledger.create_account_balance(account_id, user.subject, profile["customer_id"], request.account_type, currency)
+            balance_created = True
     except Exception:
-        try:
-            ledger.delete_account_balance(account_id)
-        except ClientError:
-            logger.exception("Could not remove balance item for account %s after a database failure", account_id)
+        if balance_created:
+            try:
+                ledger.delete_account_balance(account_id)
+            except ClientError:
+                logger.exception("Could not remove balance item for account %s after a database failure", account_id)
         raise
     invalidate_profile(user.subject)
     cache.get_cache().set(cache.owner_key(account_id), user.subject, OWNER_TTL_SECONDS)

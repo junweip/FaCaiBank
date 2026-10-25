@@ -47,7 +47,7 @@ Money movement needs an `Idempotency-Key` header (8–128 characters).
 |---|---|
 | `GET /health` | Health and deployed version |
 | `GET/POST /me` | Read or create the customer profile (email comes from the verified Cognito login) |
-| `GET/POST /accounts` | List or open linked accounts (up to five) |
+| `GET/POST /accounts` | List or open linked accounts (up to 2 everyday and 2 savings) |
 | `POST /kyc/upload` | Upload an identity document (PDF/PNG/JPG, 10 MiB); verification is simulated |
 | `GET /accounts/{id}/balance` | Strongly consistent balance (owner only) |
 | `GET /accounts/{id}/transactions` | Recent ledger entries (eventually consistent) |

@@ -13,6 +13,7 @@ rds_multi_az               = false
 enable_rds_read_replica    = false
 enable_elasticache         = false
 db_instance_class          = "db.t4g.micro"
+db_backup_retention_days   = 1 # Free account plan maximum; 7 on a paid plan
 
 # One instance per fleet, scaling to three under load.
 app_instance_type    = "t3.micro"
@@ -20,12 +21,14 @@ asg_min_size         = 1
 asg_max_size         = 3
 asg_desired_capacity = 1
 
-# Security services are cheap at prototype volume (GuardDuty and Security Hub
-# have 30-day trials). Object Lock in GOVERNANCE mode so the stack can be cleaned up.
+# GuardDuty, Security Hub and Macie are not available on the AWS Free account
+# plan (SubscriptionRequiredException). Set them to true after upgrading the
+# account to a paid plan; unused credits carry over. Object Lock in GOVERNANCE
+# mode so the stack can be cleaned up.
 enable_cloudtrail      = true
-enable_guardduty       = true
-enable_security_hub    = true
-enable_macie           = true
+enable_guardduty       = false
+enable_security_hub    = false
+enable_macie           = false
 enable_config          = true
 enable_vpc_flow_logs   = true
 audit_object_lock_mode = "GOVERNANCE"

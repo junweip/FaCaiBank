@@ -9,7 +9,7 @@ behind an `enable_*` switch, is off in `dev.tfvars` and on in `full.tfvars`.
 |---|---|
 | Sign up and authenticate | Cognito user pool with mandatory TOTP MFA ([05-compute-asg.tf](../infra/05-compute-asg.tf)); sign-up, email confirmation, MFA enrolment and sign-in in [app.js](../app/frontend/assets/app.js); JWT verification in [auth.py](../app/backend_api/auth.py) |
 | Upload KYC documents (simulated verification) | `POST /kyc/upload`: file-type check, SSE-KMS to S3, customer marked `VERIFIED_MOCK` ([main.py](../app/backend_api/main.py)) |
-| Create linked accounts | `POST /accounts`, up to five per customer, owner recorded on the ledger balance item |
+| Create linked accounts | `POST /accounts`, up to 2 everyday and 2 savings per customer (extras closed by a one-off migration), owner recorded on the ledger balance item |
 | Transfer between accounts | `POST /transfers`, a single DynamoDB transaction ([ledger.py](../app/backend_api/ledger.py)) |
 | Deposit and withdraw funds (mock external bank) | `POST /accounts/{id}/deposits` and `/withdrawals` via [external_bank.py](../app/backend_api/external_bank.py), clearing accounts and atomic reversal |
 | Receive transaction alerts | Outbox → SQS → [notifier](../app/lambda_notifier/handler.py) → SNS email, filtered per customer; `POST /me/alerts` |
