@@ -50,7 +50,7 @@ Turn anything on or off individually with the `enable_*` variables in `variables
    ```
    Confirm the SNS subscription emails AWS sends you.
 3. **Open the site**: `terraform output website_url`. Sign up, set up an authenticator app, verify your identity (any small PDF/PNG/JPG), open an account and add money.
-4. **Enable CI deploys**: in GitHub, create an environment `dev` with the secret `AWS_DEPLOY_ROLE_ARN` (bootstrap output) and variables `TF_STATE_BUCKET`, `TF_LOCK_TABLE`, optionally `ALERT_EMAIL` and `SECURITY_ALERT_EMAIL`. Add required reviewers to the environment so every apply needs an approval.
+4. **Enable CI deploys**: in GitHub, create an environment `dev` with the secret `AWS_DEPLOY_ROLE_ARN` (bootstrap output) and variable `TF_STATE_BUCKET`, optionally `ALERT_EMAIL` and `SECURITY_ALERT_EMAIL`. Add required reviewers to the environment so every apply needs an approval.
 
 ### Optional components
 

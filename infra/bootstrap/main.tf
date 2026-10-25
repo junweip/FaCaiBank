@@ -4,7 +4,7 @@
 # Actions OIDC deploy role (no long-lived AWS keys in GitHub).
 
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.10.0"
 
   required_providers {
     aws = {
@@ -237,10 +237,10 @@ output "deploy_role_arn" {
 output "backend_hcl" {
   description = "Contents for infra/backend.hcl."
   value       = <<-EOT
-    bucket         = "${aws_s3_bucket.state.bucket}"
-    key            = "facaibank/dev/terraform.tfstate"
-    region         = "${var.aws_region}"
-    dynamodb_table = "${aws_dynamodb_table.locks.name}"
-    encrypt        = true
+    bucket       = "${aws_s3_bucket.state.bucket}"
+    key          = "facaibank/dev/terraform.tfstate"
+    region       = "${var.aws_region}"
+    use_lockfile = true
+    encrypt      = true
   EOT
 }

@@ -37,5 +37,5 @@ terraform apply -var-file=dev.tfvars -var app_version=v1.2.0
 
 The state bucket is versioned. If state itself is damaged, restore the previous version of
 `facaibank/dev/terraform.tfstate` from the S3 console (*Show versions*) while nobody runs
-Terraform. The DynamoDB lock table stops two applies running at once; release a stuck lock
+Terraform. A lock file next to the state in S3 stops two applies running at once; release a stuck lock
 with `terraform force-unlock <id>` only when you are sure no apply is running.

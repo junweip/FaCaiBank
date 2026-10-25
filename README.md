@@ -68,7 +68,7 @@ each member their own login. Don't share the root password.
 
 | Tool | Why | macOS | Windows (PowerShell) |
 |---|---|---|---|
-| Terraform ≥ 1.6 | Creates the AWS resources | `brew install terraform` | `winget install Hashicorp.Terraform` |
+| Terraform ≥ 1.10 | Creates the AWS resources | `brew install terraform` | `winget install Hashicorp.Terraform` |
 | AWS CLI v2 | Stores your key; useful commands | `brew install awscli` | `winget install Amazon.AWSCLI` |
 | Python 3.12 | Tests and test scripts | `brew install python@3.12` | `winget install Python.Python.3.12` |
 | Git | Getting the code | preinstalled | `winget install Git.Git` |
