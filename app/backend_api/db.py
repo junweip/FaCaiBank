@@ -18,12 +18,14 @@ from fastapi import HTTPException
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolTimeout
 
-from . import config
+from . import account_limits, config
 
 
 logger = logging.getLogger(__name__)
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
 MIGRATION_LOCK_ID = 458_003
+# Data migrations that need DynamoDB as well as SQL, applied once after the SQL files.
+DATA_MIGRATIONS = {"0003_account_limits_2_plus_2": account_limits.enforce_account_limits}
 CREDENTIAL_TTL_SECONDS = 300
 
 
@@ -164,6 +166,13 @@ def apply_migrations(conn) -> list[str]:
             cursor.execute(path.read_text(encoding="utf-8"))
             cursor.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (path.stem,))
             applied_now.append(path.stem)
+        for version, migrate in DATA_MIGRATIONS.items():
+            if version in done:
+                continue
+            logger.info("Applying data migration %s", version)
+            migrate(conn)
+            cursor.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (version,))
+            applied_now.append(version)
     conn.commit()
     return applied_now
 
