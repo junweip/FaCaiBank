@@ -14,7 +14,7 @@ from functools import lru_cache
 import jwt
 from fastapi import Header, HTTPException
 
-from . import cache, config
+from . import cache, config, ledger
 
 
 logger = logging.getLogger(__name__)
@@ -78,12 +78,21 @@ def decode_access_token(token: str) -> dict:
     return claims
 
 
+def is_revoked(token_id: str) -> bool:
+    store = cache.get_cache()
+    if store.exists(cache.revoked_key(token_id)):
+        return True
+    # A process-local cache never sees a sign-out handled by another worker, so a
+    # miss there proves nothing. The ledger table is the shared record.
+    return not store.shared and ledger.is_session_revoked(token_id)
+
+
 def current_user(authorization: str | None = Header(default=None)) -> AuthenticatedUser:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise _unauthorized("Sign in to continue")
     token = authorization.split(" ", 1)[1].strip()
     claims = decode_access_token(token)
-    if cache.get_cache().exists(cache.revoked_key(claims["jti"])):
+    if is_revoked(claims["jti"]):
         raise _unauthorized("This session has been signed out")
     return AuthenticatedUser(
         subject=claims["sub"],
@@ -119,3 +128,4 @@ def require_recent_authentication(user: AuthenticatedUser, reason: str) -> None:
 def revoke_session(user: AuthenticatedUser) -> None:
     ttl = max(1, user.expires_at - int(time.time()))
     cache.get_cache().set(cache.revoked_key(user.token_id), True, ttl)
+    ledger.revoke_session(user.token_id, user.expires_at)

@@ -1,4 +1,4 @@
-"""DynamoDB ledger: balances, double-entry legs, outbox events and idempotency.
+"""DynamoDB ledger: balances, double-entry legs, outbox events, idempotency and revoked sessions.
 
 Every money movement is a single ``TransactWriteItems`` call, so balances,
 ledger legs, the outbox event and the idempotency record either all commit or
@@ -69,6 +69,10 @@ def idempotency_key(subject: str, key: str, operation: str) -> dict:
     return {"PK": f"IDEMPOTENCY#{subject}#{key}", "SK": operation}
 
 
+def session_revocation_key(token_id: str) -> dict:
+    return {"PK": f"REVOKED_SESSION#{token_id}", "SK": "SESSION"}
+
+
 def request_fingerprint(operation: str, payload: dict) -> str:
     canonical = json.dumps({"operation": operation, **payload}, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -90,6 +94,34 @@ def get_balance_item(account_id: str, consistent: bool = False) -> dict | None:
     )
     item = response.get("Item")
     return from_av(item) if item else None
+
+
+def revoke_session(token_id: str, expires_at: int) -> None:
+    """Record a signed-out access token where every worker can see it.
+
+    The item expires with the token itself, so DynamoDB TTL cleans it up.
+    """
+    dynamodb_client().put_item(
+        TableName=table_name(),
+        Item=to_av(
+            {
+                **session_revocation_key(token_id),
+                "record_type": "REVOKED_SESSION",
+                "revoked_at": now_iso(),
+                "expires_at": expires_at,
+            }
+        ),
+    )
+
+
+def is_session_revoked(token_id: str) -> bool:
+    response = dynamodb_client().get_item(
+        TableName=table_name(),
+        Key=to_av(session_revocation_key(token_id)),
+        ConsistentRead=True,
+        ProjectionExpression="PK",
+    )
+    return "Item" in response
 
 
 def list_transactions(account_id: str, limit: int) -> list[dict]:

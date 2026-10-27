@@ -14,6 +14,7 @@
      - Idempotency records: `PK = IDEMPOTENCY#<sub>#<key>`, `SK = TRANSFER|DEPOSIT|WITHDRAWAL` (store the original response)
      - Dedupe records: `PK = DEDUPE#<event_id>`, `SK = NOTIFICATION#<role>`
      - Statement jobs: `PK = ACCOUNT#<id>`, `SK = STATEMENT#<job_id>`
+     - Revoked sessions: `PK = REVOKED_SESSION#<jti>`, `SK = SESSION` (written at sign-out, expires with the access token; read on every request when the API has no shared cache, so every worker honours a sign-out)
    - **`facaibank-<env>-outbox-leases`**: shard leases, checkpoints and worker heartbeats for the outbox fleet.
 
 3. **Atomic Money Movement (`TransactWriteItems`)**:

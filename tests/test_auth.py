@@ -5,7 +5,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
 
-from app.backend_api import auth, cache, config
+from app.backend_api import auth, cache, config, ledger
+from conftest import TABLE
 
 
 POOL = "ap-southeast-1_testpool"
@@ -20,11 +21,16 @@ class FakeJwksClient:
 
 
 @pytest.fixture(autouse=True)
-def cognito(monkeypatch):
+def cognito(aws, monkeypatch):
     monkeypatch.setattr(
         config,
         "settings",
-        config.Settings(cognito_user_pool_id=POOL, cognito_app_client_id="web-client", aws_region="ap-southeast-1"),
+        config.Settings(
+            cognito_user_pool_id=POOL,
+            cognito_app_client_id="web-client",
+            aws_region="ap-southeast-1",
+            ledger_table_name=TABLE,
+        ),
     )
     monkeypatch.setattr(auth, "jwks_client", lambda: FakeJwksClient())
     cache.get_cache.cache_clear()
@@ -88,6 +94,45 @@ def test_revoked_session_is_rejected():
 
     with pytest.raises(HTTPException, match="signed out"):
         auth.current_user(f"Bearer {token(jti='to-revoke')}")
+
+
+def test_sign_out_handled_by_another_worker_is_honoured():
+    # Each worker has its own in-process cache, so a revocation made by one worker
+    # is invisible to the others unless it is also written to the shared ledger.
+    user = auth.current_user(f"Bearer {token(jti='signed-out-elsewhere')}")
+    auth.revoke_session(user)
+    cache.get_cache.cache_clear()  # a different worker: a fresh, empty in-process cache
+    assert not cache.get_cache().exists(cache.revoked_key("signed-out-elsewhere"))
+
+    with pytest.raises(HTTPException, match="signed out"):
+        auth.current_user(f"Bearer {token(jti='signed-out-elsewhere')}")
+
+
+def test_revocation_is_stored_durably_and_expires_with_the_token():
+    expires_at = int(time.time()) + 600
+    user = auth.current_user(f"Bearer {token(jti='durable', exp=expires_at)}")
+    auth.revoke_session(user)
+
+    assert ledger.is_session_revoked("durable")
+    assert not ledger.is_session_revoked("never-revoked")
+    item = ledger.from_av(
+        ledger.dynamodb_client().get_item(
+            TableName=TABLE, Key=ledger.to_av(ledger.session_revocation_key("durable"))
+        )["Item"]
+    )
+    assert item["expires_at"] == expires_at
+    assert item["record_type"] == "REVOKED_SESSION"
+
+
+def test_shared_cache_answers_without_a_ledger_read(monkeypatch):
+    monkeypatch.setattr(cache.MemoryCache, "shared", True)  # behave like ElastiCache
+    store = cache.get_cache()
+    monkeypatch.setattr(ledger, "is_session_revoked", lambda token_id: pytest.fail("ledger read"))
+
+    assert auth.current_user(f"Bearer {token(jti='fast-path')}").token_id == "fast-path"
+    store.set(cache.revoked_key("fast-path"), True, 60)
+    with pytest.raises(HTTPException, match="signed out"):
+        auth.current_user(f"Bearer {token(jti='fast-path')}")
 
 
 def test_step_up_challenge_follows_rfc_9470():
