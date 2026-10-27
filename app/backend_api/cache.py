@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 class MemoryCache:
     backend = "memory"
+    # Private to one worker process: a write handled by another worker cannot
+    # invalidate it, so only data that is safe to be stale belongs here.
+    shared = False
 
     def __init__(self, max_items: int = 10_000):
         self._items: dict[str, tuple[float, str]] = {}
@@ -66,6 +69,7 @@ class RedisCache:
     """Redis-compatible cache that fails open: an outage behaves like a cache miss."""
 
     backend = "elasticache"
+    shared = True
 
     def __init__(self, client):
         self._client = client
