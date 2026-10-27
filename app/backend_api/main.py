@@ -213,6 +213,9 @@ def _iso(value) -> str | None:
 
 def load_profile(subject: str, use_cache: bool = True) -> dict | None:
     store = cache.get_cache()
+    # Each worker has its own in-process cache, so a profile cached there would
+    # miss accounts and identity changes written through another worker.
+    use_cache = use_cache and store.shared
     if use_cache:
         cached = store.get(cache.profile_key(subject))
         if cached:
@@ -252,7 +255,8 @@ def load_profile(subject: str, use_cache: bool = True) -> dict | None:
             for account in accounts
         ],
     }
-    store.set(cache.profile_key(subject), profile, PROFILE_TTL_SECONDS)
+    if store.shared:
+        store.set(cache.profile_key(subject), profile, PROFILE_TTL_SECONDS)
     return profile
 
 

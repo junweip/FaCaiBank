@@ -151,11 +151,14 @@ resource "aws_wafv2_web_acl" "edge" {
 
   dynamic "rule" {
     for_each = {
-      AWSManagedRulesAmazonIpReputationList = { priority = 10, overrides = [] }
-      # KYC uploads are up to 10 MiB, so the 8 KB body size rule only counts.
-      AWSManagedRulesCommonRuleSet         = { priority = 20, overrides = ["SizeRestrictions_BODY"] }
-      AWSManagedRulesKnownBadInputsRuleSet = { priority = 30, overrides = [] }
-      AWSManagedRulesSQLiRuleSet           = { priority = 40, overrides = [] }
+      AWSManagedRulesAmazonIpReputationList = { priority = 10, overrides = [], skip_kyc_upload = false }
+      # KYC uploads are up to 10 MiB, so the 8 KB body size rule only counts. The
+      # upload is binary, and the body rules (for example CrossSiteScripting_BODY)
+      # match image metadata and block real photos, so the rule set skips that path.
+      # The API checks the size, content type and signature of the file itself.
+      AWSManagedRulesCommonRuleSet         = { priority = 20, overrides = ["SizeRestrictions_BODY"], skip_kyc_upload = true }
+      AWSManagedRulesKnownBadInputsRuleSet = { priority = 30, overrides = [], skip_kyc_upload = false }
+      AWSManagedRulesSQLiRuleSet           = { priority = 40, overrides = [], skip_kyc_upload = false }
     }
 
     content {
@@ -179,6 +182,30 @@ resource "aws_wafv2_web_acl" "edge" {
 
               action_to_use {
                 count {}
+              }
+            }
+          }
+
+          dynamic "scope_down_statement" {
+            for_each = rule.value.skip_kyc_upload ? [1] : []
+
+            content {
+              not_statement {
+                statement {
+                  byte_match_statement {
+                    search_string         = "/api/kyc/upload"
+                    positional_constraint = "EXACTLY"
+
+                    field_to_match {
+                      uri_path {}
+                    }
+
+                    text_transformation {
+                      priority = 0
+                      type     = "NONE"
+                    }
+                  }
+                }
               }
             }
           }

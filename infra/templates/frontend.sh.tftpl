@@ -27,9 +27,16 @@ server {
         return 200 "ok\n";
     }
 
+    # The internal ALB's node addresses change over time. A literal hostname in
+    # proxy_pass is resolved once at startup, so nginx would keep sending requests
+    # to nodes that no longer exist. A variable makes nginx resolve it at request time.
     location /api/ {
-        proxy_pass http://${internal_alb_dns}/;
+        resolver 169.254.169.253 valid=10s ipv6=off;
+        set $internal_alb "${internal_alb_dns}";
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://$internal_alb;
         proxy_http_version 1.1;
+        proxy_connect_timeout 5s;
         proxy_read_timeout 30s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

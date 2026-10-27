@@ -117,6 +117,65 @@ def test_redis_cache_fails_open():
     store.set("x", 1, 10)
 
 
+def _profile_rows(*nicknames):
+    customer = {
+        "user_id": "c1",
+        "full_name": "A",
+        "email": "a@example.com",
+        "kyc_status": "VERIFIED_MOCK",
+        "kyc_verified_at": None,
+        "alert_subscription_arn": None,
+        "created_at": "2026-10-01T00:00:00+00:00",
+    }
+    accounts = [
+        {"account_id": f"id-{nickname}", "account_type": "EVERYDAY", "nickname": nickname, "currency": "SGD", "created_at": None}
+        for nickname in nicknames
+    ]
+    return [customer, accounts]
+
+
+def test_profile_is_not_held_in_a_process_local_cache(monkeypatch):
+    # Two workers each have their own MemoryCache, so a write handled by the other
+    # one can never invalidate this copy. The profile must be read fresh instead.
+    from conftest import FakeDatabase
+    from app.backend_api import main
+
+    database = FakeDatabase()
+    monkeypatch.setattr(db, "primary", database)
+    monkeypatch.setattr(db, "ensure_schema", lambda: None)
+    monkeypatch.setattr(cache, "get_cache", lambda store=cache.MemoryCache(): store)
+
+    database.results = _profile_rows("first")
+    assert [a["nickname"] for a in main.load_profile("user-a")["accounts"]] == ["first"]
+
+    database.results = _profile_rows("first", "second")
+    assert [a["nickname"] for a in main.load_profile("user-a")["accounts"]] == ["first", "second"]
+
+
+def test_profile_is_cached_and_invalidated_in_a_shared_cache(monkeypatch):
+    from conftest import FakeDatabase
+    from app.backend_api import main
+
+    class SharedCache(cache.MemoryCache):
+        shared = True
+
+    database = FakeDatabase()
+    monkeypatch.setattr(db, "primary", database)
+    monkeypatch.setattr(db, "ensure_schema", lambda: None)
+    monkeypatch.setattr(cache, "get_cache", lambda store=SharedCache(): store)
+
+    database.results = _profile_rows("first")
+    main.load_profile("user-a")
+    queries = len(database.statements)
+
+    assert main.load_profile("user-a")["accounts"][0]["nickname"] == "first"
+    assert len(database.statements) == queries
+
+    main.invalidate_profile("user-a")
+    database.results = _profile_rows("first", "second")
+    assert len(main.load_profile("user-a")["accounts"]) == 2
+
+
 def test_account_limit_plan_keeps_the_two_oldest_of_each_type():
     from datetime import datetime, timedelta
     from app.backend_api import account_limits
