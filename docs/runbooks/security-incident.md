@@ -2,8 +2,8 @@
 
 The security topic receives: root-account use, IAM changes, KMS key changes, CloudTrail
 changes and console sign-in without MFA (CloudTrail metric filters); GuardDuty findings of
-severity 7 or higher; new HIGH/CRITICAL Security Hub findings; and Macie findings on the
-KYC bucket.
+severity 7 or higher; new HIGH/CRITICAL Security Hub findings; Macie findings on the
+KYC bucket; and customer PII written to an application log (`pii-in-logs`).
 
 ## First 15 minutes
 
@@ -26,6 +26,7 @@ KYC bucket.
 | CloudTrail stopped or changed | `aws cloudtrail start-logging --name facaibank-<env>-trail`, then re-apply Terraform to restore settings. |
 | GuardDuty: instance credential exfiltration or crypto mining | Replace the instance: detach it from its Auto Scaling group with the "replace" option, keep it stopped for forensics, and snapshot its volume. |
 | Macie: sensitive data in an unexpected place | Identify the object, check who wrote it (CloudTrail S3 data events), move or delete it after review. |
+| `pii-in-logs`: PII in an application log | The value is already masked for anyone without `logs:Unmask`. Open `/facaibank/<env>/log-data-protection-findings` to see which log group, stream and data type matched, find the log statement in the code and stop it logging the field. If the stream holds a lot of PII, delete it after review. |
 
 ## After the incident
 

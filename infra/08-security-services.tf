@@ -1,7 +1,8 @@
 # Audit and detection (slide 11): CloudTrail into the Object Lock audit bucket,
-# security-change alarms from the trail, and GuardDuty, Security Hub, Macie and
-# AWS Config. GuardDuty, Security Hub, Macie and Config are account-level
-# singletons: disable the matching variable if the account already has them.
+# security-change alarms from the trail, PII masking in application logs, and
+# GuardDuty, Security Hub, Macie and AWS Config. GuardDuty, Security Hub, Macie
+# and Config are account-level singletons: disable the matching variable if the
+# account already has them.
 
 # ---------------------------------------------------------------- CloudTrail
 
@@ -65,7 +66,7 @@ resource "aws_cloudtrail" "main" {
 }
 
 locals {
-  security_metric_filters = {
+  cloudtrail_metric_filters = {
     root-account-usage = {
       pattern     = "{ $.userIdentity.type = \"Root\" && $.userIdentity.invokedBy NOT EXISTS && $.eventType != \"AwsServiceEvent\" }"
       description = "The root user signed in or made an API call."
@@ -87,13 +88,29 @@ locals {
       description = "An IAM user signed in to the console without MFA."
     }
   }
+
+  # Every alarm on the security topic that comes from a log metric filter: the
+  # CloudTrail filters above, and any PII finding in application logs.
+  security_metric_filters = merge(
+    var.enable_cloudtrail ? {
+      for key, filter in local.cloudtrail_metric_filters :
+      key => merge(filter, { log_group = one(aws_cloudwatch_log_group.cloudtrail[*].name) })
+    } : {},
+    var.enable_log_data_protection ? {
+      pii-in-logs = {
+        pattern     = ""
+        description = "Customer PII was written to an application log and has been masked."
+        log_group   = one(aws_cloudwatch_log_group.log_data_protection_findings[*].name)
+      }
+    } : {},
+  )
 }
 
 resource "aws_cloudwatch_log_metric_filter" "security" {
-  for_each = var.enable_cloudtrail ? local.security_metric_filters : {}
+  for_each = local.security_metric_filters
 
   name           = "facaibank-${var.env}-${each.key}"
-  log_group_name = aws_cloudwatch_log_group.cloudtrail[0].name
+  log_group_name = each.value.log_group
   pattern        = each.value.pattern
 
   metric_transformation {
@@ -185,6 +202,74 @@ resource "aws_macie2_classification_job" "kyc" {
   lifecycle {
     ignore_changes = [job_status]
   }
+}
+
+# ---------------------------------------------------------------- PII in application logs
+
+# CloudWatch Logs data protection masks customer PII as it is ingested, so a stray
+# log line or traceback cannot expose it; only principals with logs:Unmask see the
+# original. Each match is also written to the findings log group, which raises the
+# pii-in-logs alarm above so the leaking log line gets fixed at the source.
+
+locals {
+  protected_log_groups = var.enable_log_data_protection ? merge(
+    { for key, group in aws_cloudwatch_log_group.service : key => group.name },
+    { notifier = aws_cloudwatch_log_group.notifier.name },
+    { for group in aws_cloudwatch_log_group.slack_alerts : "slack-alerts" => group.name },
+    { for group in aws_cloudwatch_log_group.ops_assistant : "ops-assistant" => group.name },
+  ) : {}
+
+  # No managed identifier covers Singapore NRIC/FIN or phone numbers. Phone numbers
+  # need the +65 prefix: a bare 8-digit pattern would also mask amounts and IDs.
+  log_custom_data_identifiers = [
+    { Name = "SgNricFin", Regex = "[STFGM]\\d{7}[A-Z]" },
+    { Name = "SgPhoneNumber", Regex = "\\+65[ -]?[3689]\\d{3}[ -]?\\d{4}" },
+  ]
+
+  log_data_identifiers = concat(
+    [for id in ["EmailAddress", "Name", "Address", "CreditCardNumber", "AwsSecretKey"] : "arn:aws:dataprotection::aws:data-identifier/${id}"],
+    local.log_custom_data_identifiers[*].Name,
+  )
+}
+
+resource "aws_cloudwatch_log_group" "log_data_protection_findings" {
+  count = var.enable_log_data_protection ? 1 : 0
+
+  name              = "/facaibank/${var.env}/log-data-protection-findings"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.main.arn
+}
+
+resource "aws_cloudwatch_log_data_protection_policy" "app" {
+  for_each = local.protected_log_groups
+
+  log_group_name = each.value
+  policy_document = jsonencode({
+    Name        = "facaibank-${var.env}-pii"
+    Description = "Mask and audit customer PII in FaCaiBank logs."
+    Version     = "2021-06-01"
+    Configuration = {
+      CustomDataIdentifier = local.log_custom_data_identifiers
+    }
+    Statement = [
+      {
+        Sid            = "audit"
+        DataIdentifier = local.log_data_identifiers
+        Operation = {
+          Audit = {
+            FindingsDestination = {
+              CloudWatchLogs = { LogGroup = aws_cloudwatch_log_group.log_data_protection_findings[0].name }
+            }
+          }
+        }
+      },
+      {
+        Sid            = "mask"
+        DataIdentifier = local.log_data_identifiers
+        Operation      = { Deidentify = { MaskConfig = {} } }
+      },
+    ]
+  })
 }
 
 # ---------------------------------------------------------------- AWS Config

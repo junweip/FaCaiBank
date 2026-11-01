@@ -1,0 +1,68 @@
+{
+  "project": "FaCaiBank",
+  "run_id": "7b72afb7f1e5",
+  "started_at": "2026-11-01T04:45:28.602213+00:00",
+  "region": "ap-southeast-1",
+  "api_url": "https://d2mdy62nxl3oqt.cloudfront.net/api",
+  "tests": {
+    "A_concurrent_acid": {
+      "status": "PASS",
+      "concurrent_requests": 5,
+      "successful_transfers": 5,
+      "sender_account_id": "8c41883f-961a-4453-968b-1565cd362206",
+      "receiver_account_id": "8b166c9a-0b28-4508-85c5-0178e26fe449",
+      "debit_total": "5.00",
+      "credit_total": "5.00",
+      "combined_balance_before": "100.00",
+      "combined_balance_after": "100.00",
+      "consistency": "Strongly consistent balance reads and base-table ledger queries",
+      "rpo_claim": "RPO 0 for committed DynamoDB transactions observed by this check"
+    },
+    "B_idempotency_replay": {
+      "status": "PASS",
+      "idempotency_key": "validation-7b72afb7f1e5-replay",
+      "first_request_status": 201,
+      "replay_status": 201,
+      "replay_header_idempotent_replayed": "true",
+      "different_body_same_key_status": 409,
+      "transaction_id": "bdfe8a90-0400-4448-a36b-4bf327fbea19",
+      "balance_before": "95.00",
+      "balance_after": "94.00",
+      "deducted_once": true
+    },
+    "C_sqs_deduplication_and_dlq": {
+      "status": "PASS",
+      "duplicate_event_id": "validation-duplicate-7b72afb7f1e5",
+      "duplicate_sqs_message_ids": [
+        "19cacb0d-2d98-494a-86d5-8a67b7434a6e",
+        "1fcabf7a-9495-4b1f-a570-8596549ac2ad"
+      ],
+      "dedupe_status": "SENT",
+      "duplicate_skip_logged": true,
+      "poison_marker": "validation-poison-7b72afb7f1e5",
+      "poison_message_id": "25361db9-cfac-4126-bcc8-87604a7fdc5c",
+      "poison_message_found_in_dlq": true,
+      "poison_lambda_failure_logs": 3,
+      "dlq_receive_count": "4",
+      "alarm_name": "facaibank-dev-events-dlq-visible",
+      "alarm_state": "ALARM",
+      "alarm_state_updated_at": "2026-11-01T13:00:41.748000+08:00",
+      "alarm_state_before_test": "OK",
+      "cleanup": "Purge or redrive the poison message from events-dlq; the alarm returns to OK afterwards."
+    },
+    "D_customer_authorization": {
+      "status": "PASS",
+      "observed_status_codes": {
+        "no_token_balance": 401,
+        "other_customer_reads_balance": 404,
+        "other_customer_reads_history": 404,
+        "other_customer_spends": 404,
+        "forged_signature": 401,
+        "logout": 204,
+        "revoked_token_after_logout": 401
+      }
+    }
+  },
+  "status": "PASS",
+  "completed_at": "2026-11-01T05:00:47.130287+00:00"
+}

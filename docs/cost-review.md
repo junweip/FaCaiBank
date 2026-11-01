@@ -30,6 +30,7 @@ So: **apply for work sessions and demos, then `terraform destroy`.** About 20 de
 | AWS WAF (1 web ACL, 5 rules) | 10 | Plus USD 0.60 per million requests |
 | CloudWatch: ~30 alarms, ~35 custom metrics, logs | 16 | Custom metrics are USD 0.30 each. Endpoint metrics are capped at six endpoints and host metrics drop the hostname dimension, so instance churn doesn't add metrics. |
 | GuardDuty, Security Hub, Config, Macie, VPC flow logs | 15 | GuardDuty and Security Hub are free for the first 30 days. Config records daily. |
+| CloudWatch Logs data protection (PII masking) | < 1 | About USD 0.12 per GB of application and Lambda logs scanned (check the Singapore price). A dev stack writes a few GB a month. Scales with log volume, so keep debug logging off in production. |
 | KMS key, Secrets Manager, DynamoDB, S3, SQS, SNS, Lambda, Scheduler, CloudFront | 4 | Usage-based and tiny at prototype volume. CloudFront's always-free tier covers 1 TB and 10 million requests. |
 | **Total** | **~205** | |
 
