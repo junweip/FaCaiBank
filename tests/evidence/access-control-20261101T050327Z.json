@@ -1,0 +1,161 @@
+{
+  "project": "FaCaiBank",
+  "test": "access-control",
+  "started_at": "2026-11-01T05:02:41.262631+00:00",
+  "iam_least_privilege": {
+    "status": "PASS",
+    "cases": [
+      {
+        "role": "frontend",
+        "action": "s3:GetObject",
+        "resource": "arn:aws:s3:::facaibank-dev-kyc-statements-619471701574-ap-southeast-1/kyc/example.pdf",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "frontend",
+        "action": "dynamodb:GetItem",
+        "resource": "arn:aws:dynamodb:ap-southeast-1:619471701574:table/facaibank-ledger",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "frontend",
+        "action": "secretsmanager:GetSecretValue",
+        "resource": "*",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "s3:PutObject",
+        "resource": "arn:aws:s3:::facaibank-dev-kyc-statements-619471701574-ap-southeast-1/kyc/example.pdf",
+        "expected": "allowed",
+        "decision": "allowed",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "s3:GetObject",
+        "resource": "arn:aws:s3:::facaibank-dev-kyc-statements-619471701574-ap-southeast-1/kyc/example.pdf",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "dynamodb:TransactWriteItems",
+        "resource": "arn:aws:dynamodb:ap-southeast-1:619471701574:table/facaibank-ledger",
+        "expected": "allowed",
+        "decision": "allowed",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "dynamodb:DeleteTable",
+        "resource": "arn:aws:dynamodb:ap-southeast-1:619471701574:table/facaibank-ledger",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "dynamodb:Scan",
+        "resource": "arn:aws:dynamodb:ap-southeast-1:619471701574:table/facaibank-ledger",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "kms:ScheduleKeyDeletion",
+        "resource": "*",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "backend",
+        "action": "s3:GetObject",
+        "resource": "arn:aws:s3:::facaibank-dev-cloudtrail-audit-619471701574-ap-southeast-1/AWSLogs/x",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "outbox",
+        "action": "dynamodb:TransactWriteItems",
+        "resource": "arn:aws:dynamodb:ap-southeast-1:619471701574:table/facaibank-ledger",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "outbox",
+        "action": "s3:GetObject",
+        "resource": "arn:aws:s3:::facaibank-dev-kyc-statements-619471701574-ap-southeast-1/kyc/example.pdf",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "statement",
+        "action": "s3:PutObject",
+        "resource": "arn:aws:s3:::facaibank-dev-kyc-statements-619471701574-ap-southeast-1/statements/example.pdf",
+        "expected": "allowed",
+        "decision": "allowed",
+        "pass": true
+      },
+      {
+        "role": "statement",
+        "action": "s3:GetObject",
+        "resource": "arn:aws:s3:::facaibank-dev-kyc-statements-619471701574-ap-southeast-1/kyc/example.pdf",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      },
+      {
+        "role": "statement",
+        "action": "dynamodb:TransactWriteItems",
+        "resource": "arn:aws:dynamodb:ap-southeast-1:619471701574:table/facaibank-ledger",
+        "expected": "denied",
+        "decision": "implicitDeny",
+        "pass": true
+      }
+    ]
+  },
+  "bucket_access": {
+    "status": "PASS",
+    "observed": {
+      "anonymous_https_get": 403,
+      "presigned_https_get": 200,
+      "presigned_plain_http_get": 403
+    },
+    "expected": {
+      "anonymous_https_get": 403,
+      "presigned_https_get": 200,
+      "presigned_plain_http_get": 403
+    }
+  },
+  "private_network_paths": {
+    "status": "PASS",
+    "observed": {
+      "rds_publicly_accessible": false,
+      "rds_ingress_source_groups": [
+        "facaibank-dev-backend-app",
+        "facaibank-dev-statement-workers"
+      ],
+      "rds_ingress_cidr_rules": 0,
+      "instances_with_public_ip": [],
+      "internet_to_rds_5432": "refused/timeout (TimeoutError)",
+      "direct_public_alb_request": "timeout (blocked by CloudFront-only security group)",
+      "frontend_tier_to_rds": "BLOCKED",
+      "api_tier_to_rds": "OPEN"
+    }
+  },
+  "status": "PASS",
+  "completed_at": "2026-11-01T05:03:27.820311+00:00"
+}

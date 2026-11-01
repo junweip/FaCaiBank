@@ -1,0 +1,37 @@
+{
+  "project": "FaCaiBank",
+  "test": "restore",
+  "started_at": "2026-11-01T05:06:53.014577+00:00",
+  "rto_target_seconds": 600,
+  "dynamodb": {
+    "status": "PASS",
+    "restore_point": "2026-11-01T05:06:53.755174+00:00",
+    "earliest_restorable": "2026-11-01 12:33:33+08:00",
+    "source_fingerprint": {
+      "items": 150,
+      "balance_items": 6,
+      "balance_sum": "0"
+    },
+    "restored_fingerprint": {
+      "items": 150,
+      "balance_items": 6,
+      "balance_sum": "0"
+    },
+    "data_matches": true,
+    "restored_table": "facaibank-ledger-restore-20261101050653",
+    "restore_seconds": 226.0,
+    "zero_sum_ledger": true,
+    "note": "Restore time grows with table size; RPO is the restore point (1 s granularity)."
+  },
+  "rds": {
+    "status": "PASS",
+    "source": "facaibank-dev-postgres",
+    "restored_instance": "facaibank-dev-postgres-restore-11010510",
+    "restored_to": "2026-11-01T05:06:21+00:00",
+    "backup_lag_seconds": 838,
+    "restore_seconds": 574.0,
+    "note": "An RDS PITR restore is a disaster-recovery path; AZ failure is handled by Multi-AZ failover instead."
+  },
+  "status": "PASS",
+  "completed_at": "2026-11-01T05:20:19.269777+00:00"
+}
