@@ -278,7 +278,10 @@ def require_verified_identity(profile: dict) -> None:
     if profile["kyc_status"] != "VERIFIED_MOCK":
         raise HTTPException(
             status_code=403,
-            detail={"code": "kyc_required", "message": "Verify your identity before moving money."},
+            detail={
+                "code": "kyc_required",
+                "message": "Verify your identity before opening an account or moving money.",
+            },
         )
 
 
@@ -379,6 +382,7 @@ def list_accounts(user: AuthenticatedUser = Depends(current_user)):
 @app.post("/accounts", status_code=201, name="open_account")
 def open_account(request: AccountCreate, user: AuthenticatedUser = Depends(current_user)):
     profile = require_profile(user)
+    require_verified_identity(profile)
     limit = ACCOUNT_LIMITS[request.account_type]
     label = request.account_type.lower()
     if sum(1 for account in profile["accounts"] if account["account_type"] == request.account_type) >= limit:

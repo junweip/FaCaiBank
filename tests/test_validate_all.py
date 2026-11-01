@@ -107,19 +107,25 @@ def test_concurrent_check_reconciles_transfer_legs_and_balances(monkeypatch):
 def test_load_test_summary_flags_targets():
     samples = {
         "balance": [(float(ms), 200) for ms in range(1, 101)],
-        "transfer": [(1500.0, 201), (400.0, 201), (300.0, 500)],
+        "transfer": [(1500.0, 201), (400.0, 201), (300.0, 500), (200.0, 409), (100.0, 0)],
     }
 
     summary = load_test.summarise(samples, duration=10)
 
-    assert summary["total_requests"] == 103
+    assert summary["total_requests"] == 105
     assert summary["endpoints"]["balance"]["p95_ms"] == 95.0
     assert summary["endpoints"]["balance"]["meets_target"] is True
     assert summary["endpoints"]["transfer"]["meets_target"] is False
-    assert summary["error_rate_percent"] == round(100 / 103, 3)
+    assert summary["endpoints"]["transfer"]["failed_requests"] == 3
+    assert summary["endpoints"]["transfer"]["server_errors"] == 1
+    assert summary["endpoints"]["transfer"]["client_errors"] == 1
+    assert summary["endpoints"]["transfer"]["transport_errors"] == 1
+    assert summary["error_rate_percent"] == round(300 / 105, 3)
     report = load_test.markdown_report(
         {"run_id": "r1", "config": {"rps": 10, "duration_seconds": 10, "users": 2}, "results": summary, "scaling": {"asg": {"start": 1, "peak": 3, "end": 2}}}
     )
+    assert "- Non-2xx response rate: **2.857%**" in report
+    assert "| transfer | 5 | 3 |" in report
     assert "| balance | 100 |" in report and "| asg | 1 | 3 | 2 |" in report
 
 

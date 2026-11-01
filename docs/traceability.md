@@ -3,13 +3,32 @@
 Where each commitment in the proposal deck (v3) lives in the code. "Optional" means it sits
 behind an `enable_*` switch, is off in `dev.tfvars` and on in `full.tfvars`.
 
+## Business context and workload assumptions
+
+The project specification is authoritative for the business target: a newly licensed
+Singapore-only online bank plans to launch within five years, with an estimated 13 million
+users at launch. Proposal v3 labels its 5-million-customer workload as provisional; that
+number is not the specification's launch population and should be corrected in the final
+presentation and report.
+
+For capacity planning, applying the proposal's 25% daily-active rate, three money movements
+per active user per day, a 3x peak factor, and a 10:1 read-to-write ratio to 13 million
+users gives approximately 3.25 million daily active users and 9.75 million daily money
+movements: 113 movements/s average and 339/s at peak. The implementation's transfer
+transaction has six DynamoDB write actions (two balances, two ledger entries, an outbox
+event, and an idempotency record), rather than the five items counted on proposal slide 17.
+That is approximately 677 item writes/s average and 2,031/s at peak, plus 6,770 reads/s
+average and 20,310/s at peak. These are assumption-based estimates, not measured capacity.
+The prototype load test measures a much smaller 40 total requests/s; it is not a launch-
+scale capacity test.
+
 ## Slide 3 — Use cases
 
 | Use case | Implementation |
 |---|---|
 | Sign up and authenticate | Cognito user pool with mandatory TOTP MFA ([05-compute-asg.tf](../infra/05-compute-asg.tf)); sign-up, email confirmation, MFA enrolment and sign-in in [app.js](../app/frontend/assets/app.js); JWT verification in [auth.py](../app/backend_api/auth.py) |
 | Upload KYC documents (simulated verification) | `POST /kyc/upload`: file-type check, SSE-KMS to S3, customer marked `VERIFIED_MOCK` ([main.py](../app/backend_api/main.py)) |
-| Create linked accounts | `POST /accounts`, up to 2 everyday and 2 savings per customer (extras closed by a one-off migration), owner recorded on the ledger balance item |
+| Create linked accounts | `POST /accounts` requires `VERIFIED_MOCK` identity status; up to 2 everyday and 2 savings per customer (extras closed by a one-off migration), owner recorded on the ledger balance item |
 | Transfer between accounts | `POST /transfers`, a single DynamoDB transaction ([ledger.py](../app/backend_api/ledger.py)) |
 | Deposit and withdraw funds (mock external bank) | `POST /accounts/{id}/deposits` and `/withdrawals` via [external_bank.py](../app/backend_api/external_bank.py), clearing accounts and atomic reversal |
 | Receive transaction alerts | Outbox → SQS → [notifier](../app/lambda_notifier/handler.py) → SNS email, filtered per customer; `POST /me/alerts` |
@@ -95,4 +114,4 @@ and optionally Slack.
 
 - Real identity proofing, FAST/PayNow settlement, SMS and push notifications (slide 13 exclusions).
 - Passkeys and Cognito adaptive authentication (Cognito Plus tier).
-- Live load at the 5-million-customer scale (slide 13: "Proof of capacity at the full target" is out of scope).
+- Live load at the 13-million-user launch target (slide 13 defers proof of capacity at the full target).

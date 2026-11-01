@@ -55,11 +55,26 @@ So: **apply for work sessions and demos, then `terraform destroy`.** About 20 de
 - **Lifecycle rules:** raw analytics exports expire after 7 days, Athena results after 30, old bundle versions after 90. Audit logs move to Glacier Deep Archive after 90 days.
 - **On-demand everywhere it fits:** DynamoDB, Lambda, SageMaker serverless and Athena bill only for use, so idle cost is close to zero.
 
-## At the proposal's planned scale
+## At the specification's planned scale
 
-The 5 million customers on slide 5 imply about 217 ledger item writes and 2,170 reads per
-second on average, three times that at peak. Transactional writes cost two write units per
-item, so on-demand DynamoDB would cost roughly USD 1,500 per month at the average rate and
-up to about USD 5,000 if the peak rate were sustained all month. Provisioned capacity with
-auto scaling, plus reserved capacity, would be the first optimisation. This is a
-production estimate only; the prototype was not load-tested at that scale.
+The project specification sets an estimated 13 million users at launch. Proposal v3's
+5-million-customer workload is marked provisional, so its original 217 item writes/s and
+2,170 reads/s should not be presented as the 13-million-user sizing case.
+
+For a comparable estimate, retain the proposal's other assumptions: 25% daily-active
+users, three money movements per active user per day, a 3x peak factor, and ten reads per
+item write. This yields about 3.25 million daily active users, 9.75 million daily money
+movements, 113 movements/s average and 339/s at peak. The implemented transfer has six
+DynamoDB write actions (two balance updates, two ledger entries, one outbox event, and one
+idempotency record); at two write capacity units per transactional item, that is about
+1,354 write units/s average and 4,063/s at peak. The corresponding read estimate is about
+6,770 requests/s average and 20,310/s at peak.
+
+Using the same rough per-item pricing basis as the earlier 5-million estimate, the write
+capacity alone is approximately USD 4,700/month at average demand, or USD 15,600/month if
+the modeled 3x peak were sustained all month. These are planning estimates, not a quote:
+they exclude reads and other services, use on-demand rates that may change, and require
+validation in the AWS Pricing Calculator. Provisioned capacity with auto scaling and
+reserved capacity would be candidates for later optimization. The prototype was not
+load-tested at these rates; its live load test targets 40 total requests/s and does not
+prove launch-scale capacity.

@@ -4,6 +4,13 @@ A fully digital retail bank prototype on AWS (Singapore region), built for IS458
 Management and Engineering, Group 3. Customers sign up with MFA, verify their identity,
 open accounts, move money, get transaction alerts and download PDF statements.
 
+The project brief describes a newly licensed bank planning to launch in Singapore within
+five years, with an estimated 13 million users at launch. This repository demonstrates
+selected banking journeys and cloud-management practices; it is not a production banking
+platform or evidence of capacity for 13 million users. Proposal v3 still uses a provisional
+5-million-customer workload model; see [docs/traceability.md](docs/traceability.md) for the
+reconciled assumptions and limits.
+
 This README explains how to get access to our AWS account, run the site and shut it down
 again. If you only want to run the unit tests, skip to [Run the tests](#run-the-tests-no-aws-needed).
 

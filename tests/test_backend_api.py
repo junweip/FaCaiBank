@@ -60,6 +60,18 @@ def test_open_account_creates_owned_zero_balance_and_metadata(bank):
     assert parameters[3:5] == ("SAVINGS", "Rainy day")
 
 
+def test_open_account_requires_verified_identity_before_creating_records(bank):
+    bank.add_customer("user-a", kyc_status="PENDING")
+
+    response = client.post("/accounts", json={"account_type": "EVERYDAY"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "kyc_required"
+    assert "before opening an account" in response.json()["detail"]["message"]
+    assert bank.database.statements == []
+    assert bank.items("ACCOUNT#") == []
+
+
 def test_account_limits_are_two_per_type(bank):
     bank.add_customer("user-a")
     bank.profiles["user-a"]["accounts"] = [
