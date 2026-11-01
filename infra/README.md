@@ -11,7 +11,7 @@
 | `05-compute-asg.tf` | Versioned bundles, ALBs, Cognito, instance roles, launch templates, four Auto Scaling groups and their scaling policies |
 | `06-monitoring-budgets.tf` | Page/ticket/security topics, alarms, RDS event subscription, budget, Slack forwarder, dashboard |
 | `07-edge-cloudfront.tf` | CloudFront, WAF (us-east-1), static assets bucket (OAC), security headers, optional domain and certificates |
-| `08-security-services.tf` | CloudTrail and security-change alarms, GuardDuty, Security Hub, Macie, AWS Config |
+| `08-security-services.tf` | CloudTrail and security-change alarms, PII masking in logs, GuardDuty, Security Hub, Macie, AWS Config |
 | `09-cache-replica.tf` | Optional ElastiCache (Valkey) and RDS read replica |
 | `10-fraud-sagemaker.tf` | Optional SageMaker serverless fraud endpoint |
 | `11-analytics.tf` | Optional analytics lake: daily export, Glue job and crawler, Athena, QuickSight |
@@ -30,6 +30,7 @@
 | ElastiCache | off | Valkey primary (AZ 1) + replica (AZ 2) |
 | Instances per fleet | 1 (scales to 3) | 3, one per AZ (scales to 6) |
 | CloudTrail, GuardDuty, Security Hub, Macie, Config | on | on |
+| PII masking in application logs | on | on |
 | SageMaker, analytics lake, Bedrock assistant | off | on |
 | Approximate cost | USD 6–7 per day | USD 30 per day |
 

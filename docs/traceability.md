@@ -68,6 +68,7 @@ SQS (retries, DLQ) → notifier Lambda (dedupe by event ID) → SNS.
 | Private subnets, SG-to-SG, VPC endpoints | Security group chain in [05-compute-asg.tf](../infra/05-compute-asg.tf) and [02-security-kms.tf](../infra/02-security-kms.tf) |
 | Secrets Manager, encrypted transport | RDS TLS (`sslmode=require`), Valkey TLS + AUTH, TLS-only bucket policies, HTTPS-only CloudFront with HSTS |
 | CloudTrail, GuardDuty, Macie, Security Hub | [08-security-services.tf](../infra/08-security-services.tf) |
+| PII masked in application logs | CloudWatch Logs data protection policy on every app and Lambda log group, [08-security-services.tf](../infra/08-security-services.tf) |
 | S3 Object Lock (WORM) audit archives | Audit bucket, retention mode configurable |
 
 ## Slide 12 — Monitoring and alerts

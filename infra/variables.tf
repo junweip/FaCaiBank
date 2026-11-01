@@ -295,6 +295,12 @@ variable "enable_macie" {
   default     = true
 }
 
+variable "enable_log_data_protection" {
+  description = "Mask and audit customer PII in application and Lambda logs (CloudWatch Logs data protection)."
+  type        = bool
+  default     = true
+}
+
 variable "enable_config" {
   description = "Enable AWS Config recording and managed compliance rules."
   type        = bool
