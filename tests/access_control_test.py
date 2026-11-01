@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
+from botocore.config import Config
 
 sys.path.insert(0, str(Path(__file__).parent))
 from live_support import write_evidence  # noqa: E402
@@ -70,7 +71,11 @@ def iam_checks(region: str, env: str, account_id: str, buckets: dict, ledger_arn
 
 
 def bucket_checks(region: str, bucket: str) -> dict:
-    s3 = boto3.client("s3", region_name=region)
+    # Same signing as the API's download links: S3 refuses SigV2 presigned URLs
+    # for KMS-encrypted objects, which is boto3's default on the global endpoint.
+    s3 = boto3.client(
+        "s3", region_name=region, config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"})
+    )
     key = f"kyc/access-test/{uuid.uuid4()}.txt"
     s3.put_object(Bucket=bucket, Key=key, Body=b"access test", ServerSideEncryption="aws:kms")
     results = {}
