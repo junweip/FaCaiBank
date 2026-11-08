@@ -72,14 +72,18 @@ def summarise(samples: dict[str, list[tuple[float, int, str | None]]], duration:
     total = errors = 0
     for name, results in samples.items():
         latencies = [millis for millis, _, _ in results]
-        failed = sum(1 for _, status, _ in results if status >= 500 or status == 0)
+        failed = sum(1 for _, status, _ in results if not 200 <= status < 300)
+        transport_errors = sum(1 for _, status, _ in results if status == 0)
+        server_errors = sum(1 for _, status, _ in results if status >= 500)
+        rejected = sum(1 for _, status, _ in results if 400 <= status < 500)
         reasons = Counter(code for _, _, code in results if code)
-        rejected = sum(reasons.values())
         total += len(results)
         errors += failed
         endpoints[name] = {
             "requests": len(results),
-            "server_errors": failed,
+            "failed_requests": failed,
+            "transport_errors": transport_errors,
+            "server_errors": server_errors,
             "client_errors": rejected,
             "client_error_codes": dict(reasons),
             "p50_ms": percentile(latencies, 50),
@@ -217,7 +221,7 @@ def markdown_report(evidence: dict) -> str:
         f"- Target rate: {evidence['config']['rps']} req/s for {evidence['config']['duration_seconds']} s "
         f"with {evidence['config']['users']} customers (10 reads : 1 write)",
         f"- Achieved throughput: **{result['throughput_rps']} req/s**, {result['total_requests']} requests",
-        f"- Server error rate: **{result['error_rate_percent']}%**",
+        f"- Non-2xx response rate: **{result['error_rate_percent']}%**",
     ]
     rejections = {
         f"{name}: {code}": count
@@ -235,13 +239,13 @@ def markdown_report(evidence: dict) -> str:
         )
     lines += [
         "",
-        "| Endpoint | Requests | p50 ms | p95 ms | p99 ms | Target p95 | Met |",
-        "|---|---:|---:|---:|---:|---:|---|",
+        "| Endpoint | Requests | Failed | p50 ms | p95 ms | p99 ms | Target p95 | Met |",
+        "|---|---:|---:|---:|---:|---:|---:|---|",
     ]
     for name, row in sorted(result["endpoints"].items()):
         met = {True: "yes", False: "**no**"}.get(row.get("meets_target"), "")
         lines.append(
-            f"| {name} | {row['requests']} | {row['p50_ms']} | {row['p95_ms']} | {row['p99_ms']} | "
+            f"| {name} | {row['requests']} | {row['failed_requests']} | {row['p50_ms']} | {row['p95_ms']} | {row['p99_ms']} | "
             f"{row['target_p95_ms'] or ''} | {met} |"
         )
     cooldown = evidence["config"].get("cooldown_seconds")
@@ -295,6 +299,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("the load test calls a live stack; pass --execute")
     if not all([args.api_url, args.user_pool_id, args.client_id]):
         parser.error("--api-url, --user-pool-id and --client-id are required")
+    if not math.isfinite(args.rps) or args.rps <= 0:
+        parser.error("--rps must be a positive finite number")
+    if args.duration <= 0 or args.users <= 0 or args.concurrency <= 0:
+        parser.error("--duration, --users and --concurrency must be positive")
 
     print(f"Provisioning {args.users} funded test customers…")
     customers: list = []

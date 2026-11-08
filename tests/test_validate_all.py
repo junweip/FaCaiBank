@@ -107,20 +107,33 @@ def test_concurrent_check_reconciles_transfer_legs_and_balances(monkeypatch):
 def test_load_test_summary_flags_targets():
     samples = {
         "balance": [(float(ms), 200, None) for ms in range(1, 101)],
-        "transfer": [(1500.0, 201, None), (400.0, 201, None), (300.0, 500, None), (90.0, 403, "step_up_required")],
+        "transfer": [
+            (1500.0, 201, None),
+            (400.0, 201, None),
+            (300.0, 500, None),
+            (200.0, 409, "idempotency_conflict"),
+            (90.0, 403, "step_up_required"),
+            (100.0, 0, None),
+        ],
     }
 
     summary = load_test.summarise(samples, duration=10)
 
-    assert summary["total_requests"] == 104
+    assert summary["total_requests"] == 106
     assert summary["endpoints"]["balance"]["p95_ms"] == 95.0
     assert summary["endpoints"]["balance"]["meets_target"] is True
     assert summary["endpoints"]["transfer"]["meets_target"] is False
-    assert summary["endpoints"]["transfer"]["client_error_codes"] == {"step_up_required": 1}
-    assert summary["error_rate_percent"] == round(100 / 104, 3)
+    assert summary["endpoints"]["transfer"]["failed_requests"] == 4
+    assert summary["endpoints"]["transfer"]["server_errors"] == 1
+    assert summary["endpoints"]["transfer"]["client_errors"] == 2
+    assert summary["endpoints"]["transfer"]["transport_errors"] == 1
+    assert summary["endpoints"]["transfer"]["client_error_codes"] == {"idempotency_conflict": 1, "step_up_required": 1}
+    assert summary["error_rate_percent"] == round(400 / 106, 3)
     report = load_test.markdown_report(
         {"run_id": "r1", "config": {"rps": 10, "duration_seconds": 10, "users": 2}, "results": summary, "scaling": {"asg": {"start": 1, "peak": 3, "end": 2}}}
     )
+    assert "- Non-2xx response rate: **3.774%**" in report
+    assert "| transfer | 6 | 4 |" in report
     assert "| balance | 100 |" in report and "| asg | 1 | 3 | 2 |" in report
     assert "transfer: step_up_required × 1" in report
 

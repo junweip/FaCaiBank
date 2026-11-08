@@ -1,5 +1,16 @@
 # FaCaiBank Architecture & Implementation Rules (AWS ap-southeast-1)
 
+## Project context and scale boundary
+
+The IS458 brief is the business source of truth: a newly licensed online bank plans to
+launch in Singapore within five years, with an estimated 13 million users at launch.
+The proposal deck's 5-million-customer workload is explicitly provisional and does not
+replace that launch target. Its demand assumptions and the prototype's measured capacity
+are separate: the deployed prototype and its 40-request/s load test do not demonstrate
+production readiness or capacity for the launch population. See
+[docs/traceability.md](docs/traceability.md) and [docs/cost-review.md](docs/cost-review.md)
+for the reconciled planning model and limitations.
+
 ## Core Architecture Rules (Strictly Enforced)
 
 1. **Region & Tagging**: All resources are in `ap-southeast-1` (Singapore). The only exceptions are the CloudFront certificate and the CLOUDFRONT-scoped WAF web ACL, which AWS requires in `us-east-1`; they hold edge configuration, never customer data. Default tags on every resource: `Project`, `Environment`, `Owner = "Group3"`, `ManagedBy`, `AppVersion`.

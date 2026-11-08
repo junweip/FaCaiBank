@@ -68,7 +68,9 @@ function toast(type, message, options = {}) {
   const dismiss = () => {
     window.clearTimeout(timer);
     node.classList.add("leaving");
-    window.setTimeout(() => node.remove(), 200);
+    window.setTimeout(() => {
+      node.remove();
+    }, 200);
   };
   const schedule = (duration) => {
     window.clearTimeout(timer);
@@ -95,6 +97,11 @@ const notify = {
   error: (message, options) => toast("error", message, options),
   info: (message, options) => toast("info", message, options),
 };
+
+function showModal(dialog) {
+  dialog.showModal();
+  dialog.append($("#toasts"));
+}
 
 /* ---------------------------------------------------------------- storage and theme */
 
@@ -344,7 +351,7 @@ function requestStepUp(detail) {
   notify.info("Please confirm it's you to continue.");
   return new Promise((resolve, reject) => {
     state.stepUp = { resolve, reject };
-    $("#step-up-modal").showModal();
+    showModal($("#step-up-modal"));
   });
 }
 
@@ -454,7 +461,7 @@ async function loadProfile() {
     state.profile = await api("/me");
   } catch (error) {
     if (error.status === 404 && error.code === "profile_required") {
-      $("#profile-modal").showModal();
+      showModal($("#profile-modal"));
       return false;
     }
     throw error;
@@ -590,6 +597,11 @@ async function refreshAllBalances() {
 }
 
 function openAccountModal() {
+  if (state.profile.kyc_status !== "VERIFIED_MOCK") {
+    notify.info("Verify your identity before opening an account. Upload an ID in Documents.");
+    window.location.hash = "#/documents";
+    return;
+  }
   const counts = accountCounts();
   const select = $("#account-type-select");
   let firstAvailable = "";
@@ -605,7 +617,7 @@ function openAccountModal() {
   }
   select.value = firstAvailable;
   $("#account-limit-hint").textContent = "Greyed-out types have reached their limit.";
-  $("#account-modal").showModal();
+  showModal($("#account-modal"));
 }
 
 /* ---------------------------------------------------------------- activity */
@@ -887,7 +899,7 @@ function wireEvents() {
   $$("[data-open-modal]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.direction) setMoneyDirection(button.dataset.direction);
-      $(`#${button.dataset.openModal}`).showModal();
+      showModal($(`#${button.dataset.openModal}`));
       if (button.dataset.openModal === "alerts-modal") loadAlertStatus();
       if (button.dataset.openModal === "money-modal") updateAvailableHints();
     });
@@ -895,6 +907,11 @@ function wireEvents() {
   $$(".modal").forEach((dialog) => {
     const close = dialog.querySelector(".modal-close");
     if (close) close.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => {
+      const activeDialog = document.querySelector("dialog:modal");
+      if (activeDialog) activeDialog.append($("#toasts"));
+      else document.body.prepend($("#toasts"));
+    });
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog && dialog.id !== "profile-modal") dialog.close();
     });
@@ -941,7 +958,7 @@ function wireEvents() {
     await api("/kyc/upload", { method: "POST", formData: body });
     form.reset();
     await loadProfile();
-    return "Identity verified (simulated). You can now move money.";
+    return "Identity verified (simulated). You can now open an account and move money.";
   });
 
   $("#receiver-choice").addEventListener("change", (event) => {
