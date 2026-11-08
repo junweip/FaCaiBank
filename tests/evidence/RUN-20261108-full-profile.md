@@ -78,3 +78,13 @@ gap is the path from one client machine through the edge, not the service. Repor
    to capture scale-in, and the report includes Auto Scaling's activity history.
 4. **`capture_dashboard.py`:** renders each CloudWatch dashboard widget as a PNG for a test window
    and saves the alarm state changes and RDS events for that window.
+
+## Console screenshots (`figures/console/`)
+
+- `asg-backend-activity-scale-out-and-in.png`: three launches 3 → 6 at 16:21 UTC and the
+  scale-in 6 → 5 → 4 → 3 at 16:43–16:47, each naming the target-tracking alarm that triggered it.
+- `asg-frontend-activity-scale-in-and-vcpu-limit.png`: frontend scale-in and the launches refused
+  by the 32-vCPU account limit.
+- `rds-events-multi-az-failover.png`: both forced failovers (15:49–15:50 and 16:02 UTC; the
+  console shows UTC+8) and the earlier conversion to Multi-AZ.
+
