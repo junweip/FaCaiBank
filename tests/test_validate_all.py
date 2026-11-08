@@ -106,21 +106,76 @@ def test_concurrent_check_reconciles_transfer_legs_and_balances(monkeypatch):
 
 def test_load_test_summary_flags_targets():
     samples = {
-        "balance": [(float(ms), 200) for ms in range(1, 101)],
-        "transfer": [(1500.0, 201), (400.0, 201), (300.0, 500)],
+        "balance": [(float(ms), 200, None) for ms in range(1, 101)],
+        "transfer": [(1500.0, 201, None), (400.0, 201, None), (300.0, 500, None), (90.0, 403, "step_up_required")],
     }
 
     summary = load_test.summarise(samples, duration=10)
 
-    assert summary["total_requests"] == 103
+    assert summary["total_requests"] == 104
     assert summary["endpoints"]["balance"]["p95_ms"] == 95.0
     assert summary["endpoints"]["balance"]["meets_target"] is True
     assert summary["endpoints"]["transfer"]["meets_target"] is False
-    assert summary["error_rate_percent"] == round(100 / 103, 3)
+    assert summary["endpoints"]["transfer"]["client_error_codes"] == {"step_up_required": 1}
+    assert summary["error_rate_percent"] == round(100 / 104, 3)
     report = load_test.markdown_report(
         {"run_id": "r1", "config": {"rps": 10, "duration_seconds": 10, "users": 2}, "results": summary, "scaling": {"asg": {"start": 1, "peak": 3, "end": 2}}}
     )
     assert "| balance | 100 |" in report and "| asg | 1 | 3 | 2 |" in report
+    assert "transfer: step_up_required × 1" in report
+
+
+def test_rejection_code_reads_the_api_error_code():
+    assert load_test.rejection_code(403, {"detail": {"code": "step_up_required"}}) == "step_up_required"
+    assert load_test.rejection_code(404, {"detail": "Recipient account was not found"}) == "http_404"
+    assert load_test.rejection_code(201, {}) is None
+    assert load_test.rejection_code(503, {"detail": {"code": "x"}}) is None
+
+
+def test_scaling_report_times_scale_in_after_the_load_ends():
+    sampler = load_test.ScalingSampler.__new__(load_test.ScalingSampler)
+    sampler.asg_names = ["api"]
+    sampler.samples = [
+        {"at": f"2026-11-08T10:{minute:02d}:00+00:00", "groups": {"api": {"desired": desired}}}
+        for minute, desired in [(0, 3), (5, 6), (10, 6), (20, 6), (27, 4), (30, 3)]
+    ]
+    sampler.load_end_index = 2
+
+    report = sampler.report()["api"]
+
+    assert report == {"start": 3, "peak": 6, "end": 3, "load_end": 6, "scale_in_after_seconds": 17 * 60}
+    markdown = load_test.markdown_report(
+        {
+            "run_id": "r1",
+            "config": {"rps": 60, "duration_seconds": 600, "users": 8, "cooldown_seconds": 1500, "cooldown_rps": 1},
+            "results": load_test.summarise({}, duration=1),
+            "scaling": {"api": report},
+            "scaling_activities": [
+                {"group": "api", "at": "2026-11-08T10:27:05+00:00", "status": "Successful", "description": "Terminating EC2 instance: i-1"}
+            ],
+        }
+    )
+    assert "| api | 3 | 6 | 6 | 3 | 1020 s |" in markdown
+    assert "10:27:05 UTC api: Terminating EC2 instance: i-1" in markdown
+
+
+def test_session_refresher_swaps_in_fresh_tokens_and_counts_failures():
+    class Customer:
+        def __init__(self, token):
+            self.token = token
+
+        def sign_in(self):
+            if self.token is None:
+                raise RuntimeError("NotAuthorizedException")
+            return self.token
+
+    good, bad = live_support.BankApi("https://x", "old"), live_support.BankApi("https://x", "old")
+    refresher = load_test.SessionRefresher([(Customer("fresh"), good, ()), (Customer(None), bad, ())], interval=1)
+
+    refresher.refresh_all()
+
+    assert good.token == "fresh" and bad.token == "old"
+    assert refresher.report()["sign_ins"] == 1 and refresher.report()["failed_sign_ins"] == 1
 
 
 def test_prober_measures_the_longest_outage():
@@ -148,3 +203,65 @@ def test_restore_fingerprint_counts_items_and_zero_sum_balances():
         table.put_item(Item={"PK": "ACCOUNT#a", "SK": "TXN#1", "amount": Decimal("500")})
 
         assert restore_test.ledger_fingerprint(table) == {"items": 3, "balance_items": 2, "balance_sum": "0"}
+
+
+def test_dashboard_widgets_are_pinned_to_the_test_window():
+    from datetime import datetime, timezone
+
+    import capture_dashboard
+
+    body = {
+        "widgets": [
+            {"type": "text", "properties": {"markdown": "x"}},
+            {"type": "metric", "properties": {"title": "Latency", "metrics": [["A", "B"]], "liveData": True}},
+        ]
+    }
+    start, end = datetime(2026, 11, 8, 10, tzinfo=timezone.utc), datetime(2026, 11, 8, 10, 40, tzinfo=timezone.utc)
+
+    [(title, widget)] = list(capture_dashboard.widget_images(body, start, end))
+
+    assert title == "Latency" and widget["title"] == "Latency (10:00-10:40 UTC)"
+    assert widget["start"] == start.isoformat() and widget["end"] == end.isoformat()
+    assert "liveData" not in widget and body["widgets"][1]["properties"]["title"] == "Latency"
+
+
+def test_failover_timeline_comes_from_rds_events():
+    from datetime import datetime, timezone
+
+    at = lambda second: datetime(2026, 11, 8, 15, 49, second, tzinfo=timezone.utc)  # noqa: E731
+    events = [
+        {"Date": at(5), "Message": "Multi-AZ instance failover started. "},
+        {"Date": at(18), "Message": "DB instance restarted"},
+        {"Date": at(55), "Message": "Multi-AZ instance failover completed"},
+    ]
+
+    timeline = failover_test.failover_timeline(events)
+
+    assert timeline["failed_over"] is True and timeline["failover_seconds"] == 50.0
+    assert len(timeline["rds_events"]) == 3
+    assert failover_test.failover_timeline([])["failed_over"] is False
+
+
+def test_alarm_widget_draws_the_alarm_for_the_window():
+    from datetime import datetime, timezone
+
+    import capture_dashboard
+
+    start, end = datetime(2026, 11, 8, 17, tzinfo=timezone.utc), datetime(2026, 11, 8, 17, 20, tzinfo=timezone.utc)
+    alarm = {
+        "AlarmName": "dlq",
+        "Namespace": "AWS/SQS",
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Dimensions": [{"Name": "QueueName", "Value": "events-dlq"}],
+        "Statistic": "Maximum",
+        "Period": 60,
+        "Threshold": 0.0,
+        "ComparisonOperator": "GreaterThanThreshold",
+    }
+
+    widget = capture_dashboard.alarm_widget(alarm, ["2026-11-08T17:09:21+00:00"], start, end)
+
+    assert widget["metrics"] == [["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "events-dlq"]]
+    assert widget["annotations"]["horizontal"][0]["value"] == 0.0
+    assert widget["annotations"]["vertical"][0]["value"] == "2026-11-08T17:09:21+00:00"
+    assert widget["title"] == "Alarm dlq (17:00-17:20 UTC)"
