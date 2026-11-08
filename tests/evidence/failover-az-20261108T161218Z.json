@@ -1,0 +1,24 @@
+{
+  "project": "FaCaiBank",
+  "test": "failover-az",
+  "started_at": "2026-11-08T16:05:02.288986+00:00",
+  "rto_target_seconds": 600,
+  "result": {
+    "zone": "ap-southeast-1a",
+    "terminated_instances": [
+      "i-09a6c34deecd86d00",
+      "i-0579876996a9c391a",
+      "i-0b57c27da1dfe7e42",
+      "i-0c3ec0b6a791c4f4d"
+    ],
+    "observed_seconds": 420,
+    "probe": {
+      "probes": 379,
+      "failed_probes": 4,
+      "availability_percent": 98.945,
+      "longest_outage_seconds": 2.4,
+      "within_rto": true
+    }
+  },
+  "completed_at": "2026-11-08T16:12:18.870203+00:00"
+}

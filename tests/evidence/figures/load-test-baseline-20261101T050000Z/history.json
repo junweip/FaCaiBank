@@ -1,0 +1,61 @@
+{
+  "label": "load-test-baseline",
+  "window": {
+    "start": "2026-11-01T05:00:00+00:00",
+    "end": "2026-11-01T05:30:00+00:00"
+  },
+  "alarm_state_changes": [
+    {
+      "at": "2026-11-01T13:00:41.748000+08:00",
+      "alarm": "facaibank-dev-events-dlq-visible",
+      "summary": "Alarm updated from OK to ALARM"
+    },
+    {
+      "at": "2026-11-01T13:03:41.748000+08:00",
+      "alarm": "facaibank-dev-events-dlq-visible",
+      "summary": "Alarm updated from ALARM to OK"
+    },
+    {
+      "at": "2026-11-01T13:05:18.251000+08:00",
+      "alarm": "facaibank-dev-security-root-account-usage",
+      "summary": "Alarm updated from ALARM to OK"
+    },
+    {
+      "at": "2026-11-01T13:06:18.251000+08:00",
+      "alarm": "facaibank-dev-security-root-account-usage",
+      "summary": "Alarm updated from OK to ALARM"
+    }
+  ],
+  "rds_events": [
+    {
+      "at": "2026-11-01T05:15:31.541000+00:00",
+      "source": "facaibank-dev-postgres-restore-11010510",
+      "message": "Restored from DB instance facaibank-dev-postgres to 2026-11-01 05:06:21.0"
+    },
+    {
+      "at": "2026-11-01T05:16:00.742000+00:00",
+      "source": "facaibank-dev-postgres-restore-11010510",
+      "message": "DB instance restarted"
+    },
+    {
+      "at": "2026-11-01T05:17:31.471000+00:00",
+      "source": "facaibank-dev-postgres-restore-11010510",
+      "message": "Backing up DB instance"
+    },
+    {
+      "at": "2026-11-01T05:20:03.663000+00:00",
+      "source": "facaibank-dev-postgres-restore-11010510",
+      "message": "Finished DB Instance backup"
+    },
+    {
+      "at": "2026-11-01T05:20:22.975000+00:00",
+      "source": "facaibank-dev-postgres-restore-11010510",
+      "message": "DB instance shutdown"
+    },
+    {
+      "at": "2026-11-01T05:23:46.647000+00:00",
+      "source": "facaibank-dev-postgres-restore-11010510",
+      "message": "DB instance deleted"
+    }
+  ]
+}
