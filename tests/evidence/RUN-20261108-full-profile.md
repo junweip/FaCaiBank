@@ -34,9 +34,21 @@ python tests/capture_dashboard.py --label <test> --start <window start> --end <w
 |---|---|---|---|
 | RDS Multi-AZ failover | 16:01:45–16:04:37 | Failover 16:02:19 → 16:02:54 (**34.9 s**). Uncached DB read (POST /me): **0 failed** of 133 probes. Cached profile (GET /me): 0 of 154. Ledger balance: 1 of 152 (one 1.1 s gap). | `failover-rds-20261108T160436Z.json`, `figures/failover-rds-20261108T155500Z/` |
 | AZ outage (ap-southeast-1a) | 16:04:58–16:12:19 | All 4 instances in the AZ terminated (one per fleet). Balance via CloudFront: **98.9%** of 379 probes, longest gap **2.4 s**; every fleet back to 3 in service. | `failover-az-20261108T161218Z.json`, `figures/failover-az-20261108T160000Z/` |
-| Load + scale-in | 16:15:22–16:51:35 | 54,000 requests at **89.98 req/s**, **0% server errors, 0 client rejections**. API and frontend scaled 3 → 6 (16:21–16:23) and back to 3 about 17 min after the load fell (16:43–16:47). | `load-test-20261108T165132Z.{json,md}`, `figures/load-test-20261108T161000Z/` (incl. `backend-scaling.json`, `frontend-scaling.json`) |
+| Load + scale-in | 16:15:22–16:51:35 | 54,000 requests at **89.98 req/s**, **0% server errors, 0 client rejections**. API scaled 3 → 6 at 16:21; frontend 3 → 5 at 16:23 (desired 6, but the 6th launch was refused five times by the account's 32-vCPU limit, see below). Both back to 3 about 17 min after the load fell (16:43–16:47). | `load-test-20261108T165132Z.{json,md}`, `figures/load-test-20261108T161000Z/` (incl. `backend-scaling.json`, `frontend-scaling.json`) |
 
 | Correctness + DLQ alarm (`validate_all.py`) | 16:57:24–17:09:23 | A concurrent ACID, B idempotent replay, C SQS dedup + DLQ, D authorization: **all PASS**. The poison message reached the DLQ at ~17:06 and `facaibank-dev-events-dlq-visible` went **OK → ALARM at 17:09:21**. | `validation-20261108T170923Z.json`, `figures/validation-dlq-alarm-20261108T165500Z/alarm-facaibank-dev-events-dlq-visible.png` |
+
+### Account vCPU limit capped the frontend at 5
+
+The account's quota for running On-Demand standard instances (A, C, D, H, I, M, R, T, Z) is
+**32 vCPU**. At the peak, 12 baseline t3.small (24 vCPU) + 3 extra API (6) + 2 extra frontend (4)
+= 32, so Auto Scaling's 6th frontend launch failed at 16:26, 16:27, 16:29, 16:33 and 16:41
+("You have requested more vCPU capacity than your current vCPU limit of 32 allows"). There was no
+customer impact: 5 frontend instances cover about 100 req/s at the 1,200 requests/min target, and
+the run had no errors. But the full profile's max of 6 per fleet (4 × 6 × 2 = 48 vCPU) cannot be
+reached in this account. Production would need a quota increase (Service Quotas, code
+`L-1216C47A`) sized to the max fleet. The failures are listed in
+`load-test-20261108T165132Z.md` and in `figures/load-test-20261108T161000Z/frontend-scaling.json`.
 
 ### Latency: client side vs server side
 
