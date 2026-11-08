@@ -136,14 +136,14 @@ def test_scaling_report_times_scale_in_after_the_load_ends():
     sampler = load_test.ScalingSampler.__new__(load_test.ScalingSampler)
     sampler.asg_names = ["api"]
     sampler.samples = [
-        {"at": f"2026-11-08T10:{minute:02d}:00+00:00", "groups": {"api": {"desired": desired}}}
+        {"at": f"2026-11-08T10:{minute:02d}:00+00:00", "groups": {"api": {"desired": desired, "in_service": min(desired, 5)}}}
         for minute, desired in [(0, 3), (5, 6), (10, 6), (20, 6), (27, 4), (30, 3)]
     ]
     sampler.load_end_index = 2
 
     report = sampler.report()["api"]
 
-    assert report == {"start": 3, "peak": 6, "end": 3, "load_end": 6, "scale_in_after_seconds": 17 * 60}
+    assert report == {"start": 3, "peak": 6, "peak_in_service": 5, "end": 3, "load_end": 6, "scale_in_after_seconds": 17 * 60}
     markdown = load_test.markdown_report(
         {
             "run_id": "r1",
@@ -151,11 +151,13 @@ def test_scaling_report_times_scale_in_after_the_load_ends():
             "results": load_test.summarise({}, duration=1),
             "scaling": {"api": report},
             "scaling_activities": [
-                {"group": "api", "at": "2026-11-08T10:27:05+00:00", "status": "Successful", "description": "Terminating EC2 instance: i-1"}
+                {"group": "api", "at": "2026-11-08T10:06:00+00:00", "status": "Failed", "description": "Launching a new EC2 instance.  Status Reason: vCPU limit"},
+                {"group": "api", "at": "2026-11-08T10:27:05+00:00", "status": "Successful", "description": "Terminating EC2 instance: i-1"},
             ],
         }
     )
-    assert "| api | 3 | 6 | 6 | 3 | 1020 s |" in markdown
+    assert "| api | 3 | 6 | 5 | 6 | 3 | 1020 s |" in markdown
+    assert "10:06:00 UTC api: **FAILED** Launching a new EC2 instance. Status Reason: vCPU limit" in markdown
     assert "10:27:05 UTC api: Terminating EC2 instance: i-1" in markdown
 
 

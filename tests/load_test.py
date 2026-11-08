@@ -141,7 +141,8 @@ class ScalingSampler(threading.Thread):
             desired = [sample["groups"].get(name, {}).get("desired", 0) for sample in self.samples]
             if not desired:
                 continue
-            row = {"start": desired[0], "peak": max(desired), "end": desired[-1]}
+            in_service = [sample["groups"].get(name, {}).get("in_service", 0) for sample in self.samples]
+            row = {"start": desired[0], "peak": max(desired), "peak_in_service": max(in_service), "end": desired[-1]}
             if self.load_end_index is not None:
                 at_end = desired[self.load_end_index]
                 row["load_end"] = at_end
@@ -249,23 +250,27 @@ def markdown_report(evidence: dict) -> str:
             "",
             f"After the main load, {evidence['config']['cooldown_rps']} req/s for {cooldown} s to observe scale-in.",
             "",
-            "| Auto Scaling group | Start | Peak | Load end | End | Scale-in after load end |",
-            "|---|---:|---:|---:|---:|---:|",
+            "| Auto Scaling group | Start | Peak desired | Peak in service | Load end | End | Scale-in after load end |",
+            "|---|---:|---:|---:|---:|---:|---:|",
         ]
         for name, row in evidence["scaling"].items():
             after = row.get("scale_in_after_seconds")
             lines.append(
-                f"| {name} | {row['start']} | {row['peak']} | {row.get('load_end', '')} | {row['end']} | "
+                f"| {name} | {row['start']} | {row['peak']} | {row.get('peak_in_service', '')} | "
+                f"{row.get('load_end', '')} | {row['end']} | "
                 f"{f'{after} s' if after is not None else ''} |"
             )
     else:
         lines += ["", "| Auto Scaling group | Start | Peak | End |", "|---|---:|---:|---:|"]
         for name, row in evidence["scaling"].items():
             lines.append(f"| {name} | {row['start']} | {row['peak']} | {row['end']} |")
-    activities = [event for event in evidence.get("scaling_activities", []) if event["status"] == "Successful"]
+    activities = evidence.get("scaling_activities", [])
     if activities:
-        lines += ["", "Scaling activity (from Auto Scaling):", ""]
-        lines += [f"- {event['at'][11:19]} UTC {event['group']}: {event['description']}" for event in activities]
+        lines += ["", "Scaling activity (from Auto Scaling, including failed launches):", ""]
+        for event in activities:
+            status = "" if event["status"] == "Successful" else f"**{event['status'].upper()}** "
+            description = " ".join(event["description"].split())[:240]
+            lines.append(f"- {event['at'][11:19]} UTC {event['group']}: {status}{description}")
     lines += ["", "Latencies are measured at the client, through CloudFront, WAF and both ALBs."]
     return "\n".join(lines) + "\n"
 
