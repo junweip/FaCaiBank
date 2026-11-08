@@ -113,6 +113,9 @@ class Database:
                     max_size=config.settings.database_pool_size,
                     timeout=5,
                     max_lifetime=1800,
+                    # Ping each connection on checkout: after an RDS Multi-AZ failover the
+                    # idle ones still point at the old primary and would fail a request each.
+                    check=ConnectionPool.check_connection,
                     name=f"facaibank-{self.role}",
                     open=True,
                 )

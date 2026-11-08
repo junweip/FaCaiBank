@@ -242,3 +242,24 @@ def test_database_endpoint_accepts_terraform_output_with_port():
         "facaibank.example.rds.amazonaws.com",
         5432,
     )
+
+
+def test_database_pool_checks_connections_before_handing_them_out(monkeypatch):
+    """After an RDS failover, idle pooled connections point at the old primary.
+
+    Without a check each one fails a request when next used (seen live: a 500 on
+    /kyc/upload three minutes after a Multi-AZ failover).
+    """
+    created = {}
+
+    class FakePool:
+        check_connection = db.ConnectionPool.check_connection
+
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+    monkeypatch.setattr(db, "ConnectionPool", FakePool)
+
+    db.Database("primary")._get_pool()
+
+    assert created["check"] is db.ConnectionPool.check_connection

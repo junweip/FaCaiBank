@@ -1,0 +1,30 @@
+{
+  "label": "failover-rds",
+  "window": {
+    "start": "2026-11-08T15:55:00+00:00",
+    "end": "2026-11-08T16:10:00+00:00"
+  },
+  "alarm_state_changes": [],
+  "rds_events": [
+    {
+      "at": "2026-11-08T16:02:19.282000+00:00",
+      "source": "facaibank-dev-postgres",
+      "message": "Multi-AZ instance failover started. "
+    },
+    {
+      "at": "2026-11-08T16:02:34.416000+00:00",
+      "source": "facaibank-dev-postgres",
+      "message": "DB instance restarted"
+    },
+    {
+      "at": "2026-11-08T16:02:54.152000+00:00",
+      "source": "facaibank-dev-postgres",
+      "message": "Multi-AZ instance failover completed"
+    },
+    {
+      "at": "2026-11-08T16:02:54.152000+00:00",
+      "source": "facaibank-dev-postgres",
+      "message": "The user requested a failover of the DB instance."
+    }
+  ]
+}

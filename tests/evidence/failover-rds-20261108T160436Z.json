@@ -1,0 +1,58 @@
+{
+  "project": "FaCaiBank",
+  "test": "failover-rds",
+  "started_at": "2026-11-08T16:01:50.271814+00:00",
+  "rto_target_seconds": 600,
+  "result": {
+    "primary_az_before": "ap-southeast-1b",
+    "primary_az_reported_after": "ap-southeast-1b",
+    "failed_over": true,
+    "failover_started_at": "2026-11-08T16:02:19.282000+00:00",
+    "failover_completed_at": "2026-11-08T16:02:54.152000+00:00",
+    "failover_seconds": 34.9,
+    "rds_events": [
+      {
+        "at": "2026-11-08T16:02:19.282000+00:00",
+        "message": "Multi-AZ instance failover started. "
+      },
+      {
+        "at": "2026-11-08T16:02:34.416000+00:00",
+        "message": "DB instance restarted"
+      },
+      {
+        "at": "2026-11-08T16:02:54.152000+00:00",
+        "message": "Multi-AZ instance failover completed"
+      },
+      {
+        "at": "2026-11-08T16:02:54.152000+00:00",
+        "message": "The user requested a failover of the DB instance."
+      }
+    ],
+    "seconds_until_available": 90.8,
+    "probes": {
+      "accounts-db (uncached POST /me)": {
+        "probes": 133,
+        "failed_probes": 0,
+        "availability_percent": 100.0,
+        "longest_outage_seconds": 0,
+        "within_rto": true
+      },
+      "profile (GET /me, cache-backed)": {
+        "probes": 154,
+        "failed_probes": 0,
+        "availability_percent": 100.0,
+        "longest_outage_seconds": 0,
+        "within_rto": true
+      },
+      "ledger (balance)": {
+        "probes": 152,
+        "failed_probes": 1,
+        "availability_percent": 99.342,
+        "longest_outage_seconds": 1.1,
+        "within_rto": true
+      }
+    },
+    "expectation": "Ledger reads (DynamoDB, 3 AZs) stay available; account metadata recovers within the RTO."
+  },
+  "completed_at": "2026-11-08T16:04:36.991389+00:00"
+}

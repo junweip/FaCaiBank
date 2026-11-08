@@ -1,8 +1,12 @@
 """Availability-zone recovery exercises (slide 4: RPO 0, RTO within 10 minutes).
 
-rds   : forces an RDS Multi-AZ failover (reboot with failover) while probing a
-        database-backed endpoint (/me) and a ledger endpoint (balance) every
-        second. Requires rds_multi_az = true.
+rds   : forces an RDS Multi-AZ failover (reboot with failover) while probing
+        every second: an uncached profile read on the primary (POST /me for an
+        existing customer), the profile as customers read it (GET /me, served
+        from ElastiCache when enabled) and a ledger endpoint (balance). Whether
+        and how long it failed over comes from RDS events, because the
+        instance's AvailabilityZone field can lag the failover by many minutes.
+        Requires rds_multi_az = true.
 az    : terminates every frontend, API and worker instance in one AZ (simulating
         the AZ going dark) and measures how long the site keeps answering while
         Auto Scaling replaces capacity in the other AZs. Requires asg_min_size
@@ -69,20 +73,36 @@ class Prober(threading.Thread):
         }
 
 
+def failover_timeline(events: list[dict]) -> dict:
+    """Failover start/completion from RDS events (oldest first)."""
+    started = next((e["Date"] for e in events if "failover started" in e["Message"]), None)
+    completed = next((e["Date"] for e in events if "failover completed" in e["Message"]), None)
+    return {
+        "failed_over": completed is not None,
+        "failover_started_at": started.isoformat() if started else None,
+        "failover_completed_at": completed.isoformat() if completed else None,
+        "failover_seconds": round((completed - started).total_seconds(), 1) if started and completed else None,
+        "rds_events": [{"at": e["Date"].isoformat(), "message": e["Message"]} for e in events],
+    }
+
+
 def rds_failover(args, api, account_id: str) -> dict:
     rds = boto3.client("rds", region_name=args.region)
     instance = rds.describe_db_instances(DBInstanceIdentifier=args.rds_identifier)["DBInstances"][0]
     if not instance["MultiAZ"]:
         raise SystemExit("RDS is not Multi-AZ; apply with rds_multi_az = true first")
     before_az = instance["AvailabilityZone"]
+    profile = {"full_name": "Live Test Failover"}
     probes = [
-        Prober("accounts-db (/me)", lambda: api.request("GET", "/me")[0]),
+        Prober("accounts-db (uncached POST /me)", lambda: api.request("POST", "/me", profile)[0]),
+        Prober("profile (GET /me, cache-backed)", lambda: api.request("GET", "/me")[0]),
         Prober("ledger (balance)", lambda: api.request("GET", f"/accounts/{account_id}/balance")[0]),
     ]
     for probe in probes:
         probe.start()
     time.sleep(15)
     started = time.monotonic()
+    requested_at = datetime.now(timezone.utc)
     rds.reboot_db_instance(DBInstanceIdentifier=args.rds_identifier, ForceFailover=True)
     time.sleep(30)
     rds.get_waiter("db_instance_available").wait(DBInstanceIdentifier=args.rds_identifier)
@@ -92,10 +112,13 @@ def rds_failover(args, api, account_id: str) -> dict:
         probe.stopped.set()
         probe.join()
     after_az = rds.describe_db_instances(DBInstanceIdentifier=args.rds_identifier)["DBInstances"][0]["AvailabilityZone"]
+    events = rds.describe_events(
+        SourceIdentifier=args.rds_identifier, SourceType="db-instance", StartTime=requested_at
+    )["Events"]
     return {
         "primary_az_before": before_az,
-        "primary_az_after": after_az,
-        "failed_over": before_az != after_az,
+        "primary_az_reported_after": after_az,
+        **failover_timeline(sorted(events, key=lambda event: event["Date"])),
         "seconds_until_available": failover_seconds,
         "probes": {probe.name: probe.report() for probe in probes},
         "expectation": "Ledger reads (DynamoDB, 3 AZs) stay available; account metadata recovers within the RTO.",

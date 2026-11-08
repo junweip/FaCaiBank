@@ -1,0 +1,3205 @@
+{
+  "project": "FaCaiBank",
+  "test": "load",
+  "run_id": "cd8b23d91ded",
+  "started_at": "2026-11-08T16:16:31.325075+00:00",
+  "completed_at": "2026-11-08T16:51:31.713390+00:00",
+  "config": {
+    "api_url": "https://d11f9g014kh4tk.cloudfront.net/api",
+    "rps": 90.0,
+    "duration_seconds": 600,
+    "users": 16,
+    "mix": "~68% balance, ~23% history, ~9% transfers (10:1 read:write)",
+    "reauth_seconds": 240,
+    "cooldown_seconds": 1500,
+    "cooldown_rps": 1
+  },
+  "results": {
+    "total_requests": 54000,
+    "throughput_rps": 89.98,
+    "error_rate_percent": 0.0,
+    "endpoints": {
+      "balance": {
+        "requests": 35665,
+        "server_errors": 0,
+        "client_errors": 0,
+        "client_error_codes": {},
+        "p50_ms": 48.4,
+        "p95_ms": 318.8,
+        "p99_ms": 406.1,
+        "mean_ms": 120.5,
+        "target_p95_ms": 200,
+        "meets_target": false
+      },
+      "transactions": {
+        "requests": 13447,
+        "server_errors": 0,
+        "client_errors": 0,
+        "client_error_codes": {},
+        "p50_ms": 52.5,
+        "p95_ms": 322.4,
+        "p99_ms": 421.8,
+        "mean_ms": 126.8,
+        "target_p95_ms": null
+      },
+      "transfer": {
+        "requests": 4888,
+        "server_errors": 0,
+        "client_errors": 0,
+        "client_error_codes": {},
+        "p50_ms": 127.8,
+        "p95_ms": 405.5,
+        "p99_ms": 704.8,
+        "mean_ms": 194.6,
+        "target_p95_ms": 1000,
+        "meets_target": true
+      }
+    }
+  },
+  "cooldown_results": {
+    "total_requests": 1500,
+    "throughput_rps": 1.0,
+    "error_rate_percent": 0.0,
+    "endpoints": {
+      "transactions": {
+        "requests": 364,
+        "server_errors": 0,
+        "client_errors": 0,
+        "client_error_codes": {},
+        "p50_ms": 55.3,
+        "p95_ms": 261.9,
+        "p99_ms": 327.8,
+        "mean_ms": 97.8,
+        "target_p95_ms": null
+      },
+      "balance": {
+        "requests": 994,
+        "server_errors": 0,
+        "client_errors": 0,
+        "client_error_codes": {},
+        "p50_ms": 51.4,
+        "p95_ms": 252.4,
+        "p99_ms": 328.4,
+        "mean_ms": 94.5,
+        "target_p95_ms": 200,
+        "meets_target": false
+      },
+      "transfer": {
+        "requests": 142,
+        "server_errors": 0,
+        "client_errors": 0,
+        "client_error_codes": {},
+        "p50_ms": 169.6,
+        "p95_ms": 336.2,
+        "p99_ms": 488.4,
+        "mean_ms": 202.7,
+        "target_p95_ms": 1000,
+        "meets_target": true
+      }
+    }
+  },
+  "sessions": {
+    "interval_seconds": 240,
+    "sign_ins": 144,
+    "failed_sign_ins": 0,
+    "failure_samples": []
+  },
+  "scaling": {
+    "facaibank-dev-frontend": {
+      "start": 3,
+      "peak": 6,
+      "end": 3,
+      "load_end": 5,
+      "scale_in_after_seconds": 1049
+    },
+    "facaibank-dev-backend": {
+      "start": 3,
+      "peak": 6,
+      "end": 3,
+      "load_end": 6,
+      "scale_in_after_seconds": 1019
+    },
+    "facaibank-dev-outbox-workers": {
+      "start": 3,
+      "peak": 3,
+      "end": 3,
+      "load_end": 3
+    },
+    "facaibank-dev-statement-workers": {
+      "start": 3,
+      "peak": 3,
+      "end": 3,
+      "load_end": 3
+    }
+  },
+  "scaling_samples": [
+    {
+      "at": "2026-11-08T16:16:31.324626+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:16:31.420662+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:16:46.537364+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:17:01.998630+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:17:17.385560+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:17:32.529940+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:17:47.660596+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:18:02.814760+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:18:17.936017+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:18:33.489821+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:18:48.981525+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:19:04.167019+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:19:19.367537+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:19:34.504290+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:19:49.940504+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:20:05.608519+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:20:20.761916+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:20:35.942917+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:20:51.095853+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:21:06.487905+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:21:21.734083+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:21:36.915868+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:21:52.119364+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:22:07.271708+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:22:22.467701+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:22:37.878102+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:22:53.308273+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:23:08.493939+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:23:23.696312+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:23:38.830558+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:23:54.299232+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:24:09.714991+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:24:24.967803+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:24:40.151557+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:24:55.302121+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:25:10.729165+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:25:26.345823+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:25:41.524075+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:25:56.707966+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:26:11.883406+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:26:27.292489+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:26:31.495567+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:26:42.477294+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:26:57.905078+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:27:13.032826+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:27:28.155096+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:27:43.279797+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:27:58.776792+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:28:14.202270+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:28:29.428993+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:28:44.547769+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:28:59.681291+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:29:15.098131+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:29:30.575875+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:29:45.776384+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:30:00.908845+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:30:16.115906+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:30:31.578542+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:30:46.875912+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:31:02.390093+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:31:17.547596+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:31:32.687008+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:31:47.827889+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:32:03.204345+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:32:18.668124+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:32:33.820969+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:32:48.972775+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:33:04.180408+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:33:19.423845+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:33:35.022389+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:33:50.169860+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:34:05.300442+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:34:20.445374+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:34:35.894029+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:34:51.041242+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:35:06.255133+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:35:21.385155+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:35:36.607723+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:35:51.742539+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:36:07.185772+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:36:22.564174+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:36:37.728800+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:36:52.878942+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:37:07.995523+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:37:23.346604+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:37:38.799720+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:37:53.964542+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:38:09.155606+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:38:24.292305+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:38:39.773381+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:38:55.192761+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:39:10.449513+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:39:25.664191+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:39:40.880517+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:39:56.034267+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:40:11.513742+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:40:26.949048+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:40:42.074274+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:40:57.245476+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:41:12.455665+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:41:27.809698+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:41:43.280375+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:41:58.413035+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:42:13.546022+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:42:28.746737+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:42:44.330852+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:42:59.651989+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:43:14.805988+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 6,
+          "in_service": 6
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:43:30.023331+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:43:45.177538+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-frontend": {
+          "desired": 6,
+          "in_service": 5
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:44:00.335462+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:44:15.760517+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 5,
+          "in_service": 5
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:44:31.185496+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:44:46.407297+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:45:01.569595+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:45:16.697461+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:45:32.135034+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:45:47.559229+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:46:02.752155+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:46:17.927750+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 4
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:46:33.075839+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:46:48.607465+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:47:03.846590+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 4,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:47:19.410309+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 4
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:47:34.540592+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:47:49.708256+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:48:04.847371+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:48:20.294156+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:48:35.706657+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:48:50.858690+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:49:06.015784+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:49:21.179346+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:49:36.543671+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:49:52.039953+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:50:07.224482+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:50:22.373643+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:50:37.520981+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:50:52.879178+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:51:08.040101+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:51:23.537413+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    },
+    {
+      "at": "2026-11-08T16:51:31.713285+00:00",
+      "groups": {
+        "facaibank-dev-backend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-frontend": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-outbox-workers": {
+          "desired": 3,
+          "in_service": 3
+        },
+        "facaibank-dev-statement-workers": {
+          "desired": 3,
+          "in_service": 3
+        }
+      }
+    }
+  ],
+  "scaling_activities": [
+    {
+      "group": "facaibank-dev-backend",
+      "at": "2026-11-08T16:21:39.371000+00:00",
+      "status": "Successful",
+      "description": "Launching a new EC2 instance: i-0900efb053f535831",
+      "cause": "At 2026-11-08T16:21:29Z a monitor alarm TargetTracking-facaibank-dev-backend-AlarmHigh-9e6de851-3b93-4148-83f5-0a53d319129a in state ALARM triggered policy facaibank-dev-backend-requests-per-target changing the desired capacity from 3 to 6.  At 2026-11-08T16:21:37Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 6."
+    },
+    {
+      "group": "facaibank-dev-backend",
+      "at": "2026-11-08T16:21:39.401000+00:00",
+      "status": "Successful",
+      "description": "Launching a new EC2 instance: i-05dfd43e18c261f49",
+      "cause": "At 2026-11-08T16:21:29Z a monitor alarm TargetTracking-facaibank-dev-backend-AlarmHigh-9e6de851-3b93-4148-83f5-0a53d319129a in state ALARM triggered policy facaibank-dev-backend-requests-per-target changing the desired capacity from 3 to 6.  At 2026-11-08T16:21:37Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 6."
+    },
+    {
+      "group": "facaibank-dev-backend",
+      "at": "2026-11-08T16:21:39.506000+00:00",
+      "status": "Successful",
+      "description": "Launching a new EC2 instance: i-03eac7ac74815a850",
+      "cause": "At 2026-11-08T16:21:29Z a monitor alarm TargetTracking-facaibank-dev-backend-AlarmHigh-9e6de851-3b93-4148-83f5-0a53d319129a in state ALARM triggered policy facaibank-dev-backend-requests-per-target changing the desired capacity from 3 to 6.  At 2026-11-08T16:21:37Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 6."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:23:02.291000+00:00",
+      "status": "Successful",
+      "description": "Launching a new EC2 instance: i-07d1b074f6cb90f36",
+      "cause": "At 2026-11-08T16:22:49Z a monitor alarm TargetTracking-facaibank-dev-frontend-AlarmHigh-927f5886-8bfe-40da-ba6c-fb8d1f11e50a in state ALARM triggered policy facaibank-dev-frontend-requests-per-target changing the desired capacity from 3 to 5.  At 2026-11-08T16:23:00Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 5."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:23:02.352000+00:00",
+      "status": "Successful",
+      "description": "Launching a new EC2 instance: i-006fb2b2ac71fb970",
+      "cause": "At 2026-11-08T16:22:49Z a monitor alarm TargetTracking-facaibank-dev-frontend-AlarmHigh-927f5886-8bfe-40da-ba6c-fb8d1f11e50a in state ALARM triggered policy facaibank-dev-frontend-requests-per-target changing the desired capacity from 3 to 5.  At 2026-11-08T16:23:00Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 3 to 5."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:26:57.027000+00:00",
+      "status": "Failed",
+      "description": "Launching a new EC2 instance.  Status Reason: You have requested more vCPU capacity than your current vCPU limit of 32 allows for the instance bucket that the specified instance type belongs to. Please visit http://aws.amazon.com/contact-us/ec2-request to request an adjustment to this limit. Launching EC2 instance failed.",
+      "cause": "At 2026-11-08T16:26:49Z a monitor alarm TargetTracking-facaibank-dev-frontend-AlarmHigh-927f5886-8bfe-40da-ba6c-fb8d1f11e50a in state ALARM triggered policy facaibank-dev-frontend-requests-per-target changing the desired capacity from 5 to 6.  At 2026-11-08T16:26:55Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 5 to 6."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:27:55.821000+00:00",
+      "status": "Failed",
+      "description": "Launching a new EC2 instance.  Status Reason: You have requested more vCPU capacity than your current vCPU limit of 32 allows for the instance bucket that the specified instance type belongs to. Please visit http://aws.amazon.com/contact-us/ec2-request to request an adjustment to this limit. Launching EC2 instance failed.",
+      "cause": "At 2026-11-08T16:27:54Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 5 to 6."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:29:53.311000+00:00",
+      "status": "Failed",
+      "description": "Launching a new EC2 instance.  Status Reason: You have requested more vCPU capacity than your current vCPU limit of 32 allows for the instance bucket that the specified instance type belongs to. Please visit http://aws.amazon.com/contact-us/ec2-request to request an adjustment to this limit. Launching EC2 instance failed.",
+      "cause": "At 2026-11-08T16:29:52Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 5 to 6."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:33:57.248000+00:00",
+      "status": "Failed",
+      "description": "Launching a new EC2 instance.  Status Reason: You have requested more vCPU capacity than your current vCPU limit of 32 allows for the instance bucket that the specified instance type belongs to. Please visit http://aws.amazon.com/contact-us/ec2-request to request an adjustment to this limit. Launching EC2 instance failed.",
+      "cause": "At 2026-11-08T16:33:56Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 5 to 6."
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:41:55.716000+00:00",
+      "status": "Failed",
+      "description": "Launching a new EC2 instance.  Status Reason: You have requested more vCPU capacity than your current vCPU limit of 32 allows for the instance bucket that the specified instance type belongs to. Please visit http://aws.amazon.com/contact-us/ec2-request to request an adjustment to this limit. Launching EC2 instance failed.",
+      "cause": "At 2026-11-08T16:41:54Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity from 5 to 6."
+    },
+    {
+      "group": "facaibank-dev-backend",
+      "at": "2026-11-08T16:43:29.323000+00:00",
+      "status": "Successful",
+      "description": "Terminating EC2 instance: i-03eac7ac74815a850",
+      "cause": "At 2026-11-08T16:43:20Z a monitor alarm TargetTracking-facaibank-dev-backend-AlarmLow-19c5ddd2-d1c8-432a-84a5-c65eefaad3eb in state ALARM triggered policy facaibank-dev-backend-requests-per-target changing the desired capacity from 6 to 5.  At 2026-11-08T16:43:29Z an instance was taken out of service in response to a difference between desired and actual capacity, shrinking the capacity from 6 to "
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:43:52.304000+00:00",
+      "status": "Successful",
+      "description": "Terminating EC2 instance: i-006fb2b2ac71fb970",
+      "cause": "At 2026-11-08T16:43:46Z a monitor alarm TargetTracking-facaibank-dev-frontend-AlarmLow-f6870df1-fb47-49d5-9a17-13435a5c51dc in state ALARM triggered policy facaibank-dev-frontend-requests-per-target changing the desired capacity from 6 to 4.  At 2026-11-08T16:43:52Z an instance was taken out of service in response to a difference between desired and actual capacity, shrinking the capacity from 5 t"
+    },
+    {
+      "group": "facaibank-dev-backend",
+      "at": "2026-11-08T16:44:22.764000+00:00",
+      "status": "Successful",
+      "description": "Terminating EC2 instance: i-0900efb053f535831",
+      "cause": "At 2026-11-08T16:44:20Z a monitor alarm TargetTracking-facaibank-dev-backend-AlarmLow-19c5ddd2-d1c8-432a-84a5-c65eefaad3eb in state ALARM triggered policy facaibank-dev-backend-requests-per-target changing the desired capacity from 5 to 4.  At 2026-11-08T16:44:22Z an instance was taken out of service in response to a difference between desired and actual capacity, shrinking the capacity from 5 to "
+    },
+    {
+      "group": "facaibank-dev-frontend",
+      "at": "2026-11-08T16:46:19.810000+00:00",
+      "status": "Successful",
+      "description": "Terminating EC2 instance: i-071fc224e93739742",
+      "cause": "At 2026-11-08T16:46:07Z a monitor alarm TargetTracking-facaibank-dev-frontend-AlarmLow-bfa454b1-ba47-48f7-94fd-17936608dc26 in state ALARM triggered policy facaibank-dev-frontend-cpu changing the desired capacity from 4 to 3.  At 2026-11-08T16:46:19Z an instance was taken out of service in response to a difference between desired and actual capacity, shrinking the capacity from 4 to 3.  At 2026-11"
+    },
+    {
+      "group": "facaibank-dev-backend",
+      "at": "2026-11-08T16:47:21.980000+00:00",
+      "status": "Successful",
+      "description": "Terminating EC2 instance: i-0df3b2adbb0b9c428",
+      "cause": "At 2026-11-08T16:47:11Z a monitor alarm TargetTracking-facaibank-dev-backend-AlarmLow-8e63468a-072c-4ded-8459-07cf9454671f in state ALARM triggered policy facaibank-dev-backend-cpu changing the desired capacity from 4 to 3.  At 2026-11-08T16:47:21Z an instance was taken out of service in response to a difference between desired and actual capacity, shrinking the capacity from 4 to 3.  At 2026-11-0"
+    }
+  ]
+}
