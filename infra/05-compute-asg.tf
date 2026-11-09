@@ -529,9 +529,11 @@ resource "aws_iam_role_policy" "backend_instance" {
         { Effect = "Allow", Action = ["sqs:SendMessage"], Resource = aws_sqs_queue.statement_jobs.arn },
         { Effect = "Allow", Action = ["sns:Subscribe"], Resource = aws_sns_topic.notifications.arn },
         {
-          Effect   = "Allow"
-          Action   = ["sns:GetSubscriptionAttributes"]
-          Resource = "${aws_sns_topic.notifications.arn}:*"
+          Effect = "Allow"
+          Action = ["sns:GetSubscriptionAttributes"]
+          # SNS authorises this call against the topic ARN, not the subscription ARN, so the bare
+          # topic ARN is required; the ":*" form alone never matched and GET /me/alerts returned 500.
+          Resource = [aws_sns_topic.notifications.arn, "${aws_sns_topic.notifications.arn}:*"]
         },
         {
           Effect    = "Allow"
