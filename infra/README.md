@@ -26,7 +26,7 @@
 |---|---|---|
 | NAT gateways | 1 | 3 (one per AZ) |
 | Interface VPC endpoints | off | on |
-| RDS | single-AZ `db.t4g.micro` | Multi-AZ `db.t4g.small` + read replica in AZ 3 |
+| RDS | single-AZ `db.t4g.micro` | Multi-AZ `db.t4g.small` (read replica off: RDS refuses one with a Secrets Manager-managed password) |
 | ElastiCache | off | Valkey primary (AZ 1) + replica (AZ 2) |
 | Instances per fleet | 1 (scales to 3) | 3, one per AZ (scales to 6) |
 | CloudTrail, GuardDuty, Security Hub, Macie, Config | on | on |

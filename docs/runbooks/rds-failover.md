@@ -41,7 +41,10 @@ python tests/failover_test.py --execute az --zone ap-southeast-1a   # needs asg_
 
 ## Replica lag
 
-The read replica (AZ 3) serves statements and reports. Lag above 5 seconds raises a ticket.
+The read replica (AZ 3) serves statements and reports when `enable_rds_read_replica` is on. It
+is off in both profiles because RDS refuses a replica while the primary uses a Secrets
+Manager-managed password, and no application path depends on it. Lag above 5 seconds
+raises a ticket.
 Statements only show account-holder details from the replica, never balances, so lag delays
 nothing customer-critical. If lag keeps growing: check replica CPU and storage, and whether
 a long query is running (`pg_stat_activity`). Workers fall back to the primary if you

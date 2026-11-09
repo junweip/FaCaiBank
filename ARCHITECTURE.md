@@ -4,12 +4,13 @@
 
 The IS458 brief is the business source of truth: a newly licensed online bank plans to
 launch in Singapore within five years, with an estimated 13 million users at launch.
-The proposal deck's 5-million-customer workload is explicitly provisional and does not
-replace that launch target. Its demand assumptions and the prototype's measured capacity
-are separate: the deployed prototype and its 40-request/s load test do not demonstrate
-production readiness or capacity for the launch population. See
-[docs/traceability.md](docs/traceability.md) and [docs/cost-review.md](docs/cost-review.md)
-for the reconciled planning model and limitations.
+The planning basis (final report, section 1) reads that as 13 million accounts held by
+5 million customers, and also tabulates the literal 13-million-customer case. The reading is
+pending confirmation with the instructor, so every capacity estimate is conditional on it.
+The prototype's measured capacity is separate: the highest load tested is 90 requests per
+second on the full profile, which does not demonstrate production readiness or capacity at
+either size. See [docs/traceability.md](docs/traceability.md) and
+[docs/cost-review.md](docs/cost-review.md) for the planning model and limitations.
 
 ## Core Architecture Rules (Strictly Enforced)
 

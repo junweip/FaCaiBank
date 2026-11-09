@@ -5,22 +5,32 @@ behind an `enable_*` switch, is off in `dev.tfvars` and on in `full.tfvars`.
 
 ## Business context and workload assumptions
 
-The project specification is authoritative for the business target: a newly licensed
-Singapore-only online bank plans to launch within five years, with an estimated 13 million
-users at launch. Proposal v3 labels its 5-million-customer workload as provisional; that
-number is not the specification's launch population and should be corrected in the final
-presentation and report.
+The project specification sets the business target: a newly licensed Singapore-only online
+bank plans to launch within five years, with an estimated 13 million users at launch.
+Proposal v3 (slide 5) lists "Accounts 13M" from the specification and a provisional 5
+million customers. The final report keeps that reading as its planning basis: 5 million
+customers holding 13 million accounts (2.6 each) and, beside it, the literal case of 13
+million customers. It is pending confirmation with the instructor, so every capacity
+estimate below is conditional on it.
 
-For capacity planning, applying the proposal's 25% daily-active rate, three money movements
-per active user per day, a 3x peak factor, and a 10:1 read-to-write ratio to 13 million
-users gives approximately 3.25 million daily active users and 9.75 million daily money
-movements: 113 movements/s average and 339/s at peak. The implementation's transfer
+Both cases apply the proposal's 25% daily-active rate, three money movements per active
+user per day, a 3x peak factor and 10 reads per ledger item write. The implemented transfer
 transaction has six DynamoDB write actions (two balances, two ledger entries, an outbox
-event, and an idempotency record), rather than the five items counted on proposal slide 17.
-That is approximately 677 item writes/s average and 2,031/s at peak, plus 6,770 reads/s
-average and 20,310/s at peak. These are assumption-based estimates, not measured capacity.
-The prototype load test measures a much smaller 40 total requests/s; it is not a launch-
-scale capacity test.
+event and an idempotency record), not the five counted on proposal slide 16.
+
+| Quantity | Planning basis (13M accounts) | Literal (13M customers) |
+|---|---|---|
+| Daily active users | 1,250,000 | 3,250,000 |
+| Money movements/s, average / peak | 43 / 130 | 113 / 339 |
+| Ledger item writes/s, average / peak | 260 / 780 | 677 / 2,031 |
+| Read requests/s, average / peak | 2,600 / 7,800 | 6,770 / 20,310 |
+| Peak API requests/s | about 7,930 | about 20,650 |
+
+These are assumption-based estimates, not measured capacity. The highest load tested is
+90 requests/s on the full profile (2026-11-08), about 1/88 of the planning-basis peak and
+1/229 of the literal case. The test used 10 reads per transfer, whereas the model implies
+about 60 reads per money movement, so compare writes and reads separately: the test ran
+about 8 transfers/s against a modelled peak of 130 movements/s.
 
 ## Slide 3 — Use cases
 

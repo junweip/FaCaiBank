@@ -5,11 +5,13 @@ Management and Engineering, Group 3. Customers sign up with MFA, verify their id
 open accounts, move money, get transaction alerts and download PDF statements.
 
 The project brief describes a newly licensed bank planning to launch in Singapore within
-five years, with an estimated 13 million users at launch. This repository demonstrates
-selected banking journeys and cloud-management practices; it is not a production banking
-platform or evidence of capacity for 13 million users. Proposal v3 still uses a provisional
-5-million-customer workload model; see [docs/traceability.md](docs/traceability.md) for the
-reconciled assumptions and limits.
+five years, with an estimated 13 million users at launch. The final report plans for 13
+million **accounts** held by 5 million customers (2.6 accounts each, within the product limit
+of four) and tabulates the literal 13-million-customer case beside it; that reading is
+pending confirmation with the instructor. This repository demonstrates selected banking
+journeys and cloud-management practices; it is not a production banking platform or evidence
+of capacity at either size. The highest load tested is 90 requests per second. See
+[docs/traceability.md](docs/traceability.md) for the assumptions and limits.
 
 This README explains how to get access to our AWS account, run the site and shut it down
 again. If you only want to run the unit tests, skip to [Run the tests](#run-the-tests-no-aws-needed).
