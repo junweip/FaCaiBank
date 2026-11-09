@@ -26,7 +26,7 @@ either size. See [docs/traceability.md](docs/traceability.md) and
      - Idempotency records: `PK = IDEMPOTENCY#<sub>#<key>`, `SK = TRANSFER|DEPOSIT|WITHDRAWAL` (store the original response)
      - Dedupe records: `PK = DEDUPE#<event_id>`, `SK = NOTIFICATION#<role>`
      - Statement jobs: `PK = ACCOUNT#<id>`, `SK = STATEMENT#<job_id>`
-     - Revoked sessions: `PK = REVOKED_SESSION#<jti>`, `SK = SESSION` (written at sign-out, expires with the access token; read on every request when the API has no shared cache, so every worker honours a sign-out)
+     - Revoked sessions: `PK = REVOKED_SESSION#<jti>`, `SK = SESSION` (written at sign-out, expires with the access token; read on every request when the API has no shared cache, and whenever the shared cache cannot answer, so every worker honours a sign-out and a cache outage never revalidates a signed-out token)
    - **`facaibank-<env>-outbox-leases`**: shard leases, checkpoints and worker heartbeats for the outbox fleet.
 
 3. **Atomic Money Movement (`TransactWriteItems`)**:

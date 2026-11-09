@@ -135,6 +135,35 @@ def test_shared_cache_answers_without_a_ledger_read(monkeypatch):
         auth.current_user(f"Bearer {token(jti='fast-path')}")
 
 
+class DownRedis:
+    def exists(self, key):
+        raise ConnectionError("cache unavailable")
+
+    get = set = delete = exists
+
+
+def use_unavailable_shared_cache(monkeypatch):
+    store = cache.RedisCache(DownRedis())
+    replacement = lambda: store  # noqa: E731
+    replacement.cache_clear = lambda: None  # the fixture above clears the real lru_cache
+    monkeypatch.setattr(cache, "get_cache", replacement)
+
+
+def test_cache_outage_does_not_revalidate_a_signed_out_token(monkeypatch):
+    user = auth.current_user(f"Bearer {token(jti='outage-revoked')}")
+    auth.revoke_session(user)
+    use_unavailable_shared_cache(monkeypatch)
+
+    with pytest.raises(HTTPException, match="signed out"):
+        auth.current_user(f"Bearer {token(jti='outage-revoked')}")
+
+
+def test_cache_outage_still_admits_a_token_that_was_never_signed_out(monkeypatch):
+    use_unavailable_shared_cache(monkeypatch)
+
+    assert auth.current_user(f"Bearer {token(jti='outage-active')}").token_id == "outage-active"
+
+
 def test_step_up_challenge_follows_rfc_9470():
     stale = auth.current_user(f"Bearer {token(auth_time=int(time.time()) - 900)}")
 

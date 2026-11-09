@@ -114,7 +114,21 @@ def test_redis_cache_fails_open():
 
     assert store.get("x") is None
     assert store.exists("x") is False
+    assert store.exists_or_unknown("x") is None  # an outage is not a miss
     store.set("x", 1, 10)
+
+
+def test_redis_cache_distinguishes_a_miss_from_an_outage():
+    class Answering:
+        def __init__(self, present):
+            self.present = present
+
+        def exists(self, key):
+            return 1 if self.present else 0
+
+    assert cache.RedisCache(Answering(True)).exists_or_unknown("k") is True
+    assert cache.RedisCache(Answering(False)).exists_or_unknown("k") is False
+    assert cache.MemoryCache().exists_or_unknown("k") is False
 
 
 def _profile_rows(*nicknames):
