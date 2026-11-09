@@ -59,6 +59,9 @@ class MemoryCache:
     def exists(self, key: str) -> bool:
         return self.get(key) is not None
 
+    def exists_or_unknown(self, key: str) -> bool | None:
+        return self.exists(key)
+
     def _evict_expired(self) -> None:
         now = time.monotonic()
         for key in [key for key, (expires_at, _) in self._items.items() if expires_at < now]:
@@ -66,7 +69,12 @@ class MemoryCache:
 
 
 class RedisCache:
-    """Redis-compatible cache that fails open: an outage behaves like a cache miss."""
+    """Redis-compatible cache that fails open: an outage behaves like a cache miss.
+
+    Security decisions must not rely on that. ``exists_or_unknown`` tells a miss
+    (``False``) apart from an outage (``None``), so the sign-out check can fall back
+    to the durable record in the ledger table.
+    """
 
     backend = "elasticache"
     shared = True
@@ -100,6 +108,13 @@ class RedisCache:
         except Exception:
             logger.warning("Cache lookup failed for %s", key, exc_info=True)
             return False
+
+    def exists_or_unknown(self, key: str) -> bool | None:
+        try:
+            return bool(self._client.exists(key))
+        except Exception:
+            logger.warning("Cache lookup failed for %s", key, exc_info=True)
+            return None
 
 
 def _redis_password() -> str | None:

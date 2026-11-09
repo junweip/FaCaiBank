@@ -2,7 +2,7 @@
 
 Two layers of evidence:
 
-1. **Unit tests** (`python -m pytest -q`, 94 tests collected from 90 test functions, no AWS needed; 14 of them exercise the live-test tooling rather than the bank). DynamoDB, S3, SQS and SNS are emulated with moto, so the real transaction conditions run: ownership, insufficient funds, idempotent replay, withdrawal reversal and the zero-sum ledger invariant. CI runs them on every push.
+1. **Unit tests** (`python -m pytest -q`, 97 tests collected from 93 test functions, no AWS needed; 14 of them exercise the live-test tooling rather than the bank). DynamoDB, S3, SQS and SNS are emulated with moto, so the real transaction conditions run: ownership, insufficient funds, idempotent replay, withdrawal reversal and the zero-sum ledger invariant. CI runs them on every push.
 2. **Live scripts** in `tests/`, run against a deployed non-production stack. Each writes timestamped JSON (and Markdown for the load test) into `tests/evidence/`.
 
 The load test's error rate counts every non-2xx response, including 4xx responses and

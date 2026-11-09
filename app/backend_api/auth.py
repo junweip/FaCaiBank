@@ -80,11 +80,19 @@ def decode_access_token(token: str) -> dict:
 
 def is_revoked(token_id: str) -> bool:
     store = cache.get_cache()
-    if store.exists(cache.revoked_key(token_id)):
+    known = store.exists_or_unknown(cache.revoked_key(token_id))
+    if known:
         return True
     # A process-local cache never sees a sign-out handled by another worker, so a
-    # miss there proves nothing. The ledger table is the shared record.
-    return not store.shared and ledger.is_session_revoked(token_id)
+    # miss there proves nothing. A shared cache that could not answer (known is None)
+    # proves nothing either, so an outage must not make a signed-out token valid
+    # again. In both cases the ledger table is the shared record. A shared cache
+    # that answered "no" is trusted, which keeps the DynamoDB read off the hot path.
+    # Residual risk: a shared cache that restarts empty also answers "no" until the
+    # token expires; the ledger record is the only source for those sign-outs.
+    if known is None or not store.shared:
+        return ledger.is_session_revoked(token_id)
+    return False
 
 
 def current_user(authorization: str | None = Header(default=None)) -> AuthenticatedUser:
