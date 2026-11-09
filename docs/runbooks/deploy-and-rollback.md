@@ -1,5 +1,13 @@
 # Deploying and rolling back
 
+> **Status (2026-11-09):** the pipeline below is defined and its AWS side exists (OIDC
+> provider, deploy role that trusts only `repo:junweip/FaCaiBank:environment:dev`, state
+> bucket), but it has not been run. GitHub has no `dev` environment yet, no deploy workflow
+> run and no release tag. Every deployment so far was `terraform apply` from a workstation
+> with the same variable files. Before relying on it, create the `dev` environment with a
+> required reviewer and the `AWS_DEPLOY_ROLE_ARN` secret, and do a first dev-profile run.
+> Do not push a `v*` tag until then: any `v*` tag starts this workflow.
+
 ## How a release works
 
 1. Every change merges to `main` through a pull request; **CI** runs the unit tests, the frontend syntax check and `terraform validate`.
