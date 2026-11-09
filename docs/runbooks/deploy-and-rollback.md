@@ -4,7 +4,7 @@
 
 1. Every change merges to `main` through a pull request; **CI** runs the unit tests, the frontend syntax check and `terraform validate`.
 2. Tag the release: `git tag v1.3.0 && git push origin v1.3.0` (or run **Deploy** manually with a ref).
-3. **Deploy** assumes the `facaibank-github-deploy` role through OIDC (no stored AWS keys), runs `terraform plan` against the shared state, saves the plan as a build artifact, waits for the `dev` environment approval, and applies.
+3. **Deploy** assumes the `facaibank-github-deploy` role through OIDC (no stored AWS keys), and runs inside the `dev` GitHub environment. If that environment has required reviewers, the approval is requested **before the job starts**, so the approver sees the commit and profile but not the plan. The job then runs `terraform plan` against the shared state, saves the plan as a build artifact and applies it straight away; there is no pause between plan and apply. The same applies to a rollback.
 4. Application code ships as content-addressed bundles in the artifacts bucket. A code change creates a new launch template version, and each Auto Scaling group runs an **instance refresh**: new instances launch and must pass health checks before old ones terminate (`min_healthy_percentage = 100`), so there's no downtime even with one instance per fleet.
 5. The workflow polls `/api/health` until it reports the new version, then writes the URL to the job summary.
 

@@ -11,9 +11,12 @@ private_data_subnet_cidrs = ["10.0.21.0/24", "10.0.22.0/24", "10.0.23.0/24"]
 single_nat_gateway         = false
 enable_interface_endpoints = true
 rds_multi_az               = true
-enable_rds_read_replica    = true
-enable_elasticache         = true
-db_instance_class          = "db.t4g.small"
+# RDS for PostgreSQL refuses a read replica while the primary uses a Secrets Manager
+# managed master password (manage_master_user_password = true), so the replica was never
+# created on the 2026-11-08 full-profile run. No application path reads from it.
+enable_rds_read_replica = false
+enable_elasticache      = true
+db_instance_class       = "db.t4g.small"
 
 # Full fleet redundancy: one instance per AZ in every fleet.
 app_instance_type    = "t3.small"

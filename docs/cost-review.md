@@ -10,14 +10,16 @@ prices change and some services bill by usage.
 | Profile | Per day | Per 30 days | Use it for |
 |---|---:|---:|---|
 | Before this branch (first release) | ~5 | ~155 | — |
-| `dev.tfvars` | ~6.5 | ~200 | Development sessions; destroy when idle |
+| `dev.tfvars` | ~6.8 | ~205 | Development sessions; destroy when idle |
 | `dev.tfvars` + office-hours schedule | ~5.5 | ~165 | A stack that stays up for a whole week |
-| `full.tfvars` | ~30 | ~900 | Demo day and failover drills only |
+| `full.tfvars` | ~33 | ~990 | Demo day and failover drills only |
 
 The team has a **USD 200 credit**, and a dev stack left running for a month uses all of it.
-So: **apply for work sessions and demos, then `terraform destroy`.** About 20 dev-days plus
-2 full-profile days fits within the credit. The budget alarms (50/80/100% of
-`monthly_budget_limit`, plus a forecast alarm) warn before that happens.
+So: **apply for work sessions and demos, then `terraform destroy`.** At these estimates, 20
+dev-days plus 2 full-profile days is about USD 202, which is slightly over the credit, so
+plan for about 18 dev-days or use the office-hours schedule. Check the real figure in Cost
+Explorer. The budget alarms (50/80/100% of `monthly_budget_limit`, plus a forecast alarm)
+warn before the credit runs out.
 
 ## Where the money goes (dev profile, per month)
 
@@ -41,7 +43,7 @@ So: **apply for work sessions and demos, then `terraform destroy`.** About 20 de
 | Interface VPC endpoints (11 services × 3 AZs) | 10.3 | USD 0.013/hour per endpoint per AZ. Turn off `enable_interface_endpoints` to save a third of the full-profile cost. |
 | EC2: 12 × t3.small | 7.9 | Full redundancy: one instance per AZ in every fleet |
 | NAT gateways: 2 more | 2.9 | One per AZ removes the cross-AZ single point of failure |
-| RDS Multi-AZ db.t4g.small + read replica | 3.9 | Synchronous standby plus replica in AZ 3 |
+| RDS Multi-AZ db.t4g.small (+ read replica) | 3.9 | Synchronous standby. The estimate includes a replica in AZ 3, but RDS refused to create one with a Secrets Manager-managed password, so the 2026-11-08 run had none and the real figure is slightly lower |
 | ElastiCache Valkey: 2 × cache.t4g.micro | 1.0 | Primary + replica |
 | SageMaker serverless, Bedrock, Glue, Athena | < 0.5 | Pay per use; a summary of one alert with Claude Opus 5.5 costs cents |
 | QuickSight | 0.8 | USD 24/month per author after the free trial; only if subscribed |
@@ -57,24 +59,30 @@ So: **apply for work sessions and demos, then `terraform destroy`.** About 20 de
 
 ## At the specification's planned scale
 
-The project specification sets an estimated 13 million users at launch. Proposal v3's
-5-million-customer workload is marked provisional, so its original 217 item writes/s and
-2,170 reads/s should not be presented as the 13-million-user sizing case.
+The specification sets an estimated 13 million users at launch. The final report plans for
+13 million **accounts** held by 5 million customers (2.6 each) and tabulates the literal
+13-million-customer case beside it; the reading is pending confirmation with the
+instructor. [traceability.md](traceability.md) has the full workload table.
 
-For a comparable estimate, retain the proposal's other assumptions: 25% daily-active
-users, three money movements per active user per day, a 3x peak factor, and ten reads per
-item write. This yields about 3.25 million daily active users, 9.75 million daily money
-movements, 113 movements/s average and 339/s at peak. The implemented transfer has six
-DynamoDB write actions (two balance updates, two ledger entries, one outbox event, and one
-idempotency record); at two write capacity units per transactional item, that is about
-1,354 write units/s average and 4,063/s at peak. The corresponding read estimate is about
-6,770 requests/s average and 20,310/s at peak.
+With a 25% daily-active rate, three money movements per active user per day, a 3x peak
+factor and ten reads per ledger item write, the planning basis gives 43 money movements/s
+on average and 130/s at peak. The implemented transfer has six DynamoDB write actions (two
+balance updates, two ledger entries, one outbox event and one idempotency record). At two
+write units per transactional item that is about 520 write units/s on average and 1,560/s
+at peak, or about 1.35 billion write units a month at the average rate. The literal case is
+about 2.6 times higher (about 1,354 and 4,063 write units/s).
 
-Using the same rough per-item pricing basis as the earlier 5-million estimate, the write
-capacity alone is approximately USD 4,700/month at average demand, or USD 15,600/month if
-the modeled 3x peak were sustained all month. These are planning estimates, not a quote:
-they exclude reads and other services, use on-demand rates that may change, and require
-validation in the AWS Pricing Calculator. Provisioned capacity with auto scaling and
-reserved capacity would be candidates for later optimization. The prototype was not
-load-tested at these rates; its live load test targets 40 total requests/s and does not
-prove launch-scale capacity.
+At the on-demand price for ap-southeast-1 of **USD 0.71 per million write request units**
+(AWS Price List, published 2026-11-05), write capacity alone is:
+
+| Case | Average rate, per month | Peak rate sustained all month |
+|---|---:|---:|
+| Planning basis (13M accounts) | about USD 960 | about USD 2,870 |
+| Literal (13M customers) | about USD 2,500 | about USD 7,500 |
+
+The peak column is an upper bound, not a forecast. These figures exclude reads and other
+services, and prices change, so confirm them in the AWS Pricing Calculator. AWS halved
+on-demand throughput prices in November 2024; earlier versions of this file used the older
+price and overstated the figures by about 1.9 times. Provisioned capacity with auto scaling
+and reserved capacity are the candidates for later optimisation. The prototype was load
+tested at 90 requests/s, not at these rates, so it does not prove launch-scale capacity.

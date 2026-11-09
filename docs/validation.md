@@ -2,16 +2,24 @@
 
 Two layers of evidence:
 
-1. **Unit tests** (`python -m pytest -q`, about 80 tests, no AWS needed). DynamoDB, S3, SQS and SNS are emulated with moto, so the real transaction conditions run: ownership, insufficient funds, idempotent replay, withdrawal reversal and the zero-sum ledger invariant. CI runs them on every push.
+1. **Unit tests** (`python -m pytest -q`, 94 tests collected from 90 test functions, no AWS needed; 14 of them exercise the live-test tooling rather than the bank). DynamoDB, S3, SQS and SNS are emulated with moto, so the real transaction conditions run: ownership, insufficient funds, idempotent replay, withdrawal reversal and the zero-sum ledger invariant. CI runs them on every push.
 2. **Live scripts** in `tests/`, run against a deployed non-production stack. Each writes timestamped JSON (and Markdown for the load test) into `tests/evidence/`.
 
 The load test's error rate counts every non-2xx response, including 4xx responses and
 transport failures. The checked-in 2026-11-01 load-test evidence predates that correction:
 it records 1,086 4xx responses among 2,191 transfer requests (49.6%) while reporting 0%
 server errors. Treat that run as inconclusive and rerun before quoting it. It was rerun on 2026-11-08 on the full profile with customers re-signing in
-(`tests/evidence/load-test-20261108T165132Z.md`): 54,000 requests at 90 req/s, 0 non-2xx responses. The 40-request/s
-test is a prototype demonstration, not proof of capacity for the specification's 13-million-
-user launch target.
+(`tests/evidence/load-test-20261108T165132Z.md`): 54,000 requests at 90 req/s, 0 non-2xx responses. That test is a
+prototype demonstration, not proof of capacity for the specification's 13-million launch
+target. It used 10 reads per transfer (about 8 transfers/s from one laptop and 16 customers),
+a WAF rate limit raised to 100,000 per 5 minutes and no read replica, and it does not
+reconcile the ledger afterwards.
+
+Limits of the failover evidence: the probes run at about one request per second with no
+other load; the RDS figure (34.9 s) is the interval between the failover start and
+completion events, and the instance was available about 91 s after the request; the AZ
+test terminates EC2 instances only, not the zone's NAT gateway, load balancer, cache or
+database.
 
 ## Setup for the live scripts
 

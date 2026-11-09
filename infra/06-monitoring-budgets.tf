@@ -123,8 +123,8 @@ resource "aws_sns_topic_subscription" "security_email" {
 
 resource "aws_cloudwatch_metric_alarm" "endpoint_latency_p95" {
   for_each = {
-    balance  = { threshold = 200, description = "Balance p95 above 200 ms for 5 minutes (slide 4 target)." }
-    transfer = { threshold = 1000, description = "Transfer commit p95 above 1 second for 5 minutes (slide 4 target)." }
+    balance  = { threshold = 200, description = "Balance p95 above 200 ms for 5 minutes (slide 4 target). See docs/runbooks/monitoring-and-alerts.md#latency." }
+    transfer = { threshold = 1000, description = "Transfer commit p95 above 1 second for 5 minutes (slide 4 target). See docs/runbooks/monitoring-and-alerts.md#latency." }
   }
 
   alarm_name          = "facaibank-${var.env}-${each.key}-latency-p95"
@@ -149,7 +149,7 @@ resource "aws_cloudwatch_metric_alarm" "endpoint_latency_p95" {
 
 resource "aws_cloudwatch_metric_alarm" "alb_5xx_rate" {
   alarm_name          = "facaibank-${var.env}-alb-5xx-error-rate"
-  alarm_description   = "ALB 5xx response rate exceeded 1 percent."
+  alarm_description   = "ALB 5xx response rate exceeded 1 percent. See docs/runbooks/monitoring-and-alerts.md#errors."
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 3
   datapoints_to_alarm = 2
@@ -218,7 +218,7 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_targets" {
   }
 
   alarm_name          = "facaibank-${var.env}-${each.key}-unhealthy-targets"
-  alarm_description   = "At least one ${each.key} instance has failed ALB health checks for 5 minutes."
+  alarm_description   = "At least one ${each.key} instance has failed ALB health checks for 5 minutes. See docs/runbooks/monitoring-and-alerts.md#errors."
   namespace           = "AWS/ApplicationELB"
   metric_name         = "UnHealthyHostCount"
   statistic           = "Maximum"
@@ -239,7 +239,7 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_targets" {
 # DynamoDB does not publish a stream iterator age; the outbox worker does.
 resource "aws_cloudwatch_metric_alarm" "dynamodb_stream_iterator_age" {
   alarm_name          = "facaibank-${var.env}-dynamodb-stream-iterator-age"
-  alarm_description   = "Outbox workers are more than 60 seconds behind the ledger stream."
+  alarm_description   = "Outbox workers are more than 60 seconds behind the ledger stream. See docs/runbooks/worker-recovery.md."
   namespace           = "FaCaiBank/Workers"
   metric_name         = "OutboxIteratorAgeMilliseconds"
   statistic           = "Maximum"
@@ -299,7 +299,7 @@ resource "aws_cloudwatch_metric_alarm" "statement_dlq_visible" {
 
 resource "aws_cloudwatch_metric_alarm" "statement_oldest_job" {
   alarm_name          = "facaibank-${var.env}-statement-oldest-job"
-  alarm_description   = "A statement job has waited more than 15 minutes."
+  alarm_description   = "A statement job has waited more than 15 minutes. See docs/runbooks/worker-recovery.md."
   namespace           = "AWS/SQS"
   metric_name         = "ApproximateAgeOfOldestMessage"
   statistic           = "Maximum"
@@ -317,7 +317,7 @@ resource "aws_cloudwatch_metric_alarm" "statement_oldest_job" {
 
 resource "aws_cloudwatch_metric_alarm" "notifier_errors" {
   alarm_name          = "facaibank-${var.env}-notifier-errors"
-  alarm_description   = "The notification Lambda failed to process messages (they will retry, then go to the DLQ)."
+  alarm_description   = "The notification Lambda failed to process messages (they will retry, then go to the DLQ). See docs/runbooks/worker-recovery.md."
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   statistic           = "Sum"
@@ -335,7 +335,7 @@ resource "aws_cloudwatch_metric_alarm" "notifier_errors" {
 
 resource "aws_cloudwatch_metric_alarm" "ledger_throttles" {
   alarm_name          = "facaibank-${var.env}-ledger-write-throttles"
-  alarm_description   = "DynamoDB throttled ledger writes. Check for hot partitions or account-level limits."
+  alarm_description   = "DynamoDB throttled ledger writes. Check for hot partitions or account-level limits. See docs/runbooks/monitoring-and-alerts.md#throttling."
   namespace           = "AWS/DynamoDB"
   metric_name         = "WriteThrottleEvents"
   statistic           = "Sum"
@@ -355,7 +355,7 @@ resource "aws_cloudwatch_metric_alarm" "replica_lag" {
   count = var.enable_rds_read_replica ? 1 : 0
 
   alarm_name          = "facaibank-${var.env}-rds-replica-lag"
-  alarm_description   = "RDS read replica is more than 5 seconds behind the primary."
+  alarm_description   = "RDS read replica is more than 5 seconds behind the primary. See docs/runbooks/rds-failover.md#replica-lag."
   namespace           = "AWS/RDS"
   metric_name         = "ReplicaLag"
   statistic           = "Maximum"
